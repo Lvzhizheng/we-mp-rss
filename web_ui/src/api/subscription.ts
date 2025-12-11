@@ -42,7 +42,8 @@ export interface MpSearchResult {
 export const getSubscriptions = (params?: { page?: number; pageSize?: number }) => {
   const apiParams = {
     offset: (params?.page || 0) * (params?.pageSize || 10),
-    limit: params?.pageSize || 10
+    limit: params?.pageSize || 10,
+    kw: params?.kw || ""
   }
   return http.get<SubscriptionListResult>('/wx/mps', { params: apiParams })
 }

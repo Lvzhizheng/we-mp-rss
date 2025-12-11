@@ -22,6 +22,15 @@
             </a-dropdown>
           </template>
           <div style="display: flex; flex-direction: column;; background: #fff">
+            <div style="margin-bottom: 12px;">
+              <a-input-search 
+                v-model="mpSearchText" 
+                placeholder="搜索公众号名称" 
+                @search="handleMpSearch" 
+                @keyup.enter="handleMpSearch"
+                allow-clear 
+                size="small" />
+            </div>
             <a-list :data="mpList" :loading="mpLoading" bordered>
               <template #item="{ item, index }">
                 <a-list-item @click="handleMpClick(item.id)" :class="{ 'active-mp': activeMpId === item.id }"
@@ -211,6 +220,7 @@ const mpPagination = ref({
 })
 const searchText = ref('')
 const filterStatus = ref('')
+const mpSearchText = ref('')
 
 const pagination = ref({
   current: 1,
@@ -287,6 +297,11 @@ const columns = [
 const handleMpPageChange = (page: number, pageSize: number) => {
   mpPagination.value.current = page
   mpPagination.value.pageSize = pageSize
+  fetchMpList()
+}
+
+const handleMpSearch = () => {
+  mpPagination.value.current = 1
   fetchMpList()
 }
 const rssFormat = ref('atom')
@@ -602,7 +617,8 @@ const fetchMpList = async () => {
   try {
     const res = await getSubscriptions({
       page: mpPagination.value.current - 1,
-      pageSize: mpPagination.value.pageSize
+      pageSize: mpPagination.value.pageSize,
+      kw: mpSearchText.value
     })
 
     mpList.value = res.list.map(item => ({
@@ -612,14 +628,16 @@ const fetchMpList = async () => {
       mp_intro: item.mp_intro || item.mp_intro || '',
       article_count: item.article_count || 0
     }))
-    // 添加'全部'选项
-    mpList.value.unshift({
-      id: '',
-      name: '全部',
-      avatar: '/static/logo.svg',
-      mp_intro: '显示所有公众号文章',
-      article_count: res.total || 0
-    });
+    // 添加'全部'选项 - 只在没有搜索时显示
+    if (!mpSearchText.value) {
+      mpList.value.unshift({
+        id: '',
+        name: '全部',
+        avatar: '/static/logo.svg',
+        mp_intro: '显示所有公众号文章',
+        article_count: res.total || 0
+      });
+    }
     mpPagination.value.total = res.total || 0
   } catch (error) {
     console.error('获取公众号列表错误:', error)
