@@ -798,7 +798,11 @@ class WeChatAPI:
         if rel==False:
             print_warning("未登录，Token登录失败")
         return rel
-            
+    def QRcode(self):
+        return {
+            "code":f"/{self.wx_login_url}?t={(time.time())}",
+            "is_exists":self.GetHasCode(),
+        }      
     def GetCode(self,CallBack=None,Notice=None):
         if self.GetHasCode():
             return {
