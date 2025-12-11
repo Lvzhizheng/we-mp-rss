@@ -5,7 +5,7 @@ set platform=linux/amd64,linux/arm64
 echo 当前版本: %VERSION%
 set name=we-mp-rss:%VERSION%
 
-if "%1"=="-test" (
+if "%1"=="-t" (
 docker stop we-mp-rss
 docker stop we-mp-rss-arm
 docker rm we-mp-rss

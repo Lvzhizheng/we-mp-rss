@@ -197,6 +197,7 @@ export async function toggleBrowserNotification(): Promise<boolean> {
 export function initBrowserNotification() {
   const saved = localStorage.getItem('browserNotificationEnabled')
   if (saved === 'true') {
+    console.log("initBrowserNotification")
     enableBrowserNotification()
   }
 }

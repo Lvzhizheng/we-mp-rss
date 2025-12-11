@@ -221,6 +221,9 @@ const showSponsorModal = (e: Event) => {
   sponsorVisible.value = true
   console.log('Sponsor modal triggered') // 添加调试日志
 }
+import { 
+  initBrowserNotification 
+} from '@/utils/browserNotification'
 import { useRouter, useRoute } from 'vue-router'
 import { Message } from '@arco-design/web-vue'
 import { getCurrentUser } from '@/api/auth'
@@ -296,6 +299,7 @@ onMounted(() => {
   if (isAuthenticated.value) {
     fetchUserInfo()
   }
+  initBrowserNotification()
   translatePage();
   fetchSysInfo();
 })
