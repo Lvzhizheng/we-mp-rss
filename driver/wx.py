@@ -25,7 +25,7 @@ class Wx:
     WX_LOGIN="https://mp.weixin.qq.com/"
     WX_HOME="https://mp.weixin.qq.com/cgi-bin/home"
     wx_login_url="static/wx_qrcode.png"
-    lock_file_path="data/.lock"
+    lock_file_path="data/lock.lock"
     CallBack=None
     Notice=None
     ext_data = None
@@ -551,7 +551,7 @@ class Wx:
     def check_lock(self):
         """检查锁定状态"""
         time.sleep(1)
-        return os.path.exists(self.lock_file_path)
+        return os.path.exists(self.lock_file_path) or self.GetHasCode()
         
     def set_lock(self):
         """创建锁定文件"""

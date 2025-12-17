@@ -19,9 +19,10 @@ from PIL import Image
 import qrcode
 from io import BytesIO
 
+
 from sqlalchemy import true
 
-from core.print import print_warning
+from core.print import print_warning,print_success
 from .token import get as get_token,set_token
 import logging
 # 配置日志
@@ -46,6 +47,7 @@ class WeChatAPI:
         self.cookies:Optional[Dict[str,str]] = {}
         self.qr_code_path = "static/wx_qrcode.png"
         self.wx_login_url=f"{self.qr_code_path}"
+        self.lock_file_path="data/lock.lock"
         # 线程安全
         self._lock = Lock()
         
@@ -80,6 +82,13 @@ class WeChatAPI:
             包含二维码信息的字典
         """
         self.__init__()
+        if self.check_lock():
+            print_warning("微信公众平台登录脚本正在运行，请勿重复运行")
+            return {
+                'code': None,
+                'is_exists': False,
+                'msg': '微信公众平台登录脚本正在运行，请勿重复运行'
+            }
         with self._lock:
             self.login_callback = callback
             self.notice_callback = notice
@@ -95,7 +104,7 @@ class WeChatAPI:
                 if qr_info:
                     # 生成二维码图片
                     self._generate_qr_image(qr_info['qr_url'])
-                    
+                    self.set_lock()
                     # 启动登录状态检查
                     self._start_login_check(qr_info['uuid'])
                     
@@ -398,7 +407,8 @@ class WeChatAPI:
                 if self.notice_callback:
                     self.notice_callback('检查登录状态失败,请重试')
                 # Timer(5.0, check_login).start()  # 出错后延长检查间隔
-        
+            finally:
+                self.release_lock()
         # 启动检查
         Timer(2.0, check_login).start()
 
@@ -640,6 +650,8 @@ class WeChatAPI:
     def switch_account(self,username:str=""):
         """切换微信公众号账号"""
         self.login_with_token()
+        from driver.wx import WX_API
+        WX_API.switch_account()
         return
         url = f"{self.base_url}/cgi-bin/switchacct?action=switch"
         
@@ -869,7 +881,9 @@ class WeChatAPI:
             "is_exists":self.GetHasCode(),
         }      
     def GetCode(self,CallBack=None,Notice=None):
-        if self.GetHasCode():
+        from core.print import print_warning
+        if self.check_lock():
+            print_warning("微信公众平台登录脚本正在运行，请勿重复运行")
             return {
                 "code":f"/{self.wx_login_url}?t={(time.time())}",
                 "is_exists":self.GetHasCode(),
@@ -888,7 +902,24 @@ class WeChatAPI:
         if os.path.exists(self.wx_login_url):
             return True
         return False
-    
+    def check_lock(self):
+        """检查锁定状态"""
+        time.sleep(1)
+        return os.path.exists(self.lock_file_path) or self.GetHasCode()
+    def set_lock(self):
+        """创建锁定文件"""
+        with open(self.lock_file_path, 'w') as f:
+            f.write(str(time.time()))
+        self.isLOCK = True
+        
+    def release_lock(self):
+        """删除锁定文件"""
+        try:
+            os.remove(self.lock_file_path)
+            self.isLOCK = False
+            return True
+        except:
+            return False
     def HasLogin(self):
         return self._islogin and not self.GetHasCode()
     def Close(self):
