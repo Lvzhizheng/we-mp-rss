@@ -190,8 +190,8 @@ import { Avatar } from '@/utils/constants'
 import { translatePage, setCurrentLanguage } from '@/utils/translate';
 import { ref, onMounted, h } from 'vue'
 import axios from 'axios'
-import { IconApps, IconAtt, IconDelete, IconEdit, IconEye, IconRefresh, IconScan, IconWeiboCircleFill, IconWifi, IconCode } from '@arco-design/web-vue/es/icon'
-import { getArticles, deleteArticle as deleteArticleApi, ClearArticle, ClearDuplicateArticle, getArticleDetail } from '@/api/article'
+import { IconApps, IconAtt, IconDelete, IconEdit, IconEye, IconRefresh, IconScan, IconWeiboCircleFill, IconWifi, IconCode, IconCheck, IconClose } from '@arco-design/web-vue/es/icon'
+import { getArticles, deleteArticle as deleteArticleApi, ClearArticle, ClearDuplicateArticle, getArticleDetail, toggleArticleReadStatus } from '@/api/article'
 import { ExportOPML, ExportMPS, ImportMPS } from '@/api/export'
 import ExportModal from '@/components/ExportModal.vue'
 import { getSubscriptions, UpdateMps } from '@/api/subscription'
@@ -246,6 +246,30 @@ const statusColorMap = {
 
 const columns = [
   {
+    title: '阅读状态',
+    dataIndex: 'is_read',
+    width: '100',
+    render: ({ record }) => {
+      const isRead = record.is_read === 1;
+      return h('div', { 
+        style: { 
+          display: 'flex', 
+          alignItems: 'center', 
+          cursor: 'pointer',
+          color: isRead ? 'var(--color-success)' : 'var(--color-text-3)'
+        },
+        onClick: () => toggleReadStatus(record)
+      }, [
+        h(isRead ? IconCheck : IconClose, { 
+          style: { marginRight: '4px' } 
+        }),
+        h('span', { 
+          style: { fontSize: '12px' } 
+        }, isRead ? '已读' : '未读')
+      ]);
+    }
+  },
+  {
     title: '文章标题',
     dataIndex: 'title',
     width: window.innerWidth - 1000,
@@ -254,7 +278,11 @@ const columns = [
       href: record.url || '#',
       title: record.title,
       target: '_blank',
-      style: { color: 'var(--color-text-1)' }
+      style: { 
+        color: 'var(--color-text-1)',
+        textDecoration: record.is_read === 1 ? 'line-through' : 'none',
+        opacity: record.is_read === 1 ? 0.7 : 1
+      }
     }, record.title)
   },
   {
@@ -540,6 +568,11 @@ const viewArticle = async (record: any,action_type: number) => {
     }
     articleModalVisible.value = true
     window.location="#topreader"
+    
+    // 自动标记为已读（仅在查看当前文章时，不是上一篇/下一篇）
+    if (action_type === 0 && record.is_read !== 1) {
+      await toggleReadStatus(record)
+    }
   } catch (error) {
     console.error('获取文章详情错误:', error)
     Message.error(error)
@@ -731,6 +764,25 @@ const exportArticles = () => {
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
   Message.success('导出成功');
+};
+
+// 切换文章阅读状态
+const toggleReadStatus = async (record: any) => {
+  try {
+    const newReadStatus = record.is_read === 1 ? false : true;
+    await toggleArticleReadStatus(record.id, newReadStatus);
+    
+    // 更新本地数据
+    const index = articles.value.findIndex(item => item.id === record.id);
+    if (index !== -1) {
+      articles.value[index].is_read = newReadStatus ? 1 : 0;
+    }
+    
+    Message.success(`文章已标记为${newReadStatus ? '已读' : '未读'}`);
+  } catch (error) {
+    console.error('更新阅读状态失败:', error);
+    Message.error('更新阅读状态失败');
+  }
 };
 </script>
 

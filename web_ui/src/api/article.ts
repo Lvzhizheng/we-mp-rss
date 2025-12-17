@@ -10,6 +10,7 @@ import http from './http'
  * @property status 文章状态
  * @property link 文章链接
  * @property created_at 创建时间
+ * @property is_read 阅读状态
  */
 export interface Article {
   id: number
@@ -20,6 +21,7 @@ export interface Article {
   status: number
   link: string
   created_at: string
+  is_read?: number
 }
 
 /**
@@ -129,5 +131,17 @@ export const ClearArticle = (id: number) => {
  */
 export const ClearDuplicateArticle = (id: number) => {
   return http.delete<{code: number, message: string}>(`/wx/articles/clean_duplicate_articles`)
+}
+
+/**
+ * 切换文章阅读状态
+ * @param id 文章ID
+ * @param is_read 阅读状态
+ * @returns 操作结果
+ */
+export const toggleArticleReadStatus = (id: number, is_read: boolean) => {
+  return http.put<{code: number, message: string, is_read: boolean}>(`/wx/articles/${id}/read`, null, {
+    params: { is_read }
+  })
 }
 

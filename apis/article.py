@@ -43,6 +43,47 @@ async def clean_orphan_articles(
                 message="清理无效文章失败"
             )
         )
+
+@router.put("/{article_id}/read", summary="改变文章阅读状态")
+async def toggle_article_read_status(
+    article_id: str,
+    is_read: bool = Query(..., description="阅读状态: true为已读, false为未读"),
+    current_user: dict = Depends(get_current_user)
+):
+    session = DB.get_session()
+    try:
+        from core.models.article import Article
+        
+        # 检查文章是否存在
+        article = session.query(Article).filter(Article.id == article_id).first()
+        if not article:
+            raise HTTPException(
+                status_code=fast_status.HTTP_404_NOT_FOUND,
+                detail=error_response(
+                    code=40401,
+                    message="文章不存在"
+                )
+            )
+        
+        # 更新阅读状态
+        article.is_read = 1 if is_read else 0
+        session.commit()
+        
+        return success_response({
+            "message": f"文章已标记为{'已读' if is_read else '未读'}",
+            "is_read": is_read
+        })
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        session.rollback()
+        raise HTTPException(
+            status_code=fast_status.HTTP_406_NOT_ACCEPTABLE,
+            detail=error_response(
+                code=50001,
+                message=f"更新文章阅读状态失败: {str(e)}"
+            )
+        )
     
 @router.delete("/clean_duplicate_articles", summary="清理重复文章")
 async def clean_duplicate(

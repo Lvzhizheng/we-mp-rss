@@ -13,5 +13,6 @@ class ArticleBase(Base):
     created_at = Column(DateTime)
     updated_at = Column(DateTime)  
     is_export = Column(Integer)
+    is_read = Column(Integer, default=0)
 class Article(ArticleBase):
     content = Column(Text)
