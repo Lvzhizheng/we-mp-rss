@@ -28,23 +28,13 @@ services:
       - PASSWORD=admin@123
       - WERSS_AUTH_WEB=True
       - WE_RSS.AUTH=True
+      - DINGDING_WEBHOOK=https://oapi.dingtalk.com/robot/send?access_token=af7f99c32895f79d9d61c57181f164b77027102a22f3b205dc15e2984690025c
+      - WE_RSS.AUTH=True
     volumes:
       - ./data:/app/data
     depends_on:
       - mysql
 
-  watchtower:
-    image: containrrr/watchtower
-    container_name: watchtower
-    restart: always
-    environment:
-      - TZ=Asia/Shanghai
-      - WATCHTOWER_POLL_INTERVAL=3600
-      - WATCHTOWER_CLEANUP=true
-      - WATCHTOWER_INCLUDE_RESTARTING=true
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-    command: --interval 3600 --cleanup --include-restarting
 
 volumes:
   db_data:
