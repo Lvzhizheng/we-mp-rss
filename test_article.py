@@ -158,8 +158,8 @@ if __name__=="__main__":
     # testWeb()
     # testNotice()
     # testMd2Doc()
-    testLogin()
-    # test_send_wx_code()
+    # testLogin()
+    test_send_wx_code()
     # testCheckAuth()
     # testToken()  # 注释掉避免线程冲突
     # testMarkDown()

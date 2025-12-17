@@ -107,7 +107,8 @@ class WeChatAPI:
                     self.set_lock()
                     # 启动登录状态检查
                     self._start_login_check(qr_info['uuid'])
-                    
+                    if  self.notice_callback is not None:
+                        self.notice_callback()
                     return {
                         'code': f"{self.qr_code_path}?t={int(time.time())}",
                         'is_exists': os.path.exists(self.qr_code_path),
