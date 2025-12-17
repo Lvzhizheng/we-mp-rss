@@ -185,6 +185,8 @@
           <div style="text-align: center;">
             <p>如果您觉得这个项目对您有帮助,请给Rachel来一杯Coffee吧~ </p>
             <img src="@/assets/images/sponsor.jpg" alt="赞赏码" style="max-width: 300px; margin-top: 20px;">
+            <p>您打赏的金额将用于维护项目的运行成本，感谢您的支持！</p>
+            <p>打赏后可以发送单号到<a href="mailto:rachelos@qq.com">rachelos@qq.com</a></p>
           </div>
         </a-modal>
       </div>
@@ -214,11 +216,13 @@ const handleLanguageChange = (language: string) => {
   setCurrentLanguage(language);
   currentLanguage.value = language;
 };
-
-const sponsorVisible = ref(false)
+const sponsorCount:number = parseInt(localStorage.getItem('sponsor'))|| 0
+localStorage.setItem('sponsor', (sponsorCount+1).toString())
+const sponsorVisible = ref(sponsorCount<3)
 const showSponsorModal = (e: Event) => {
   e.preventDefault()
   sponsorVisible.value = true
+  localStorage.setItem('sponsor',"0")
   console.log('Sponsor modal triggered') // 添加调试日志
 }
 import { 
@@ -296,6 +300,7 @@ const handleLogout = async () => {
 }
 
 onMounted(() => {
+ 
   if (isAuthenticated.value) {
     fetchUserInfo()
   }
