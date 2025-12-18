@@ -274,7 +274,7 @@ class WXArticleFetcher:
                 #     page.locator("#js_verify").click()
                 # except:
                 self.controller.cleanup()
-                self.Wait(tips="当前环境异常，完成验证后即可继续访问")
+                Wait(tips="当前环境异常，完成验证后即可继续访问")
                 raise Exception("当前环境异常，完成验证后即可继续访问")
             if "该内容已被发布者删除" in body or "The content has been deleted by the author." in body:
                 info["content"]="DELETED"
