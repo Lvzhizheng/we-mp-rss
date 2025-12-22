@@ -1,4 +1,5 @@
 from os import remove
+from threading import Thread
 
 from sqlalchemy import false
 from driver.wxarticle import Web
@@ -146,7 +147,6 @@ async def test_Article():
 def test_send_wx_code():
     from jobs.failauth import send_wx_code
     send_wx_code()
-    input("按任意键退出")
 if __name__=="__main__":
     # import asyncio
     # test_screenshot()
@@ -158,8 +158,12 @@ if __name__=="__main__":
     # testWeb()
     # testNotice()
     # testMd2Doc()
-    # testLogin()
-    test_send_wx_code()
+    testLogin()
+    # test_send_wx_code()
     # testCheckAuth()
     # testToken()  # 注释掉避免线程冲突
     # testMarkDown()
+    while True:
+        cmd=input("输入exit退出")
+        if cmd.strip().lower()=="exit":
+            break
