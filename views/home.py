@@ -12,10 +12,12 @@ from core.models.article import Article
 from core.lax.template_parser import TemplateParser
 from views.config import base
 from driver.wxarticle import Web
+from core.cache import cache_view, clear_cache_pattern
 # 创建路由器
 router = APIRouter(tags=["首页"])
 
 @router.get("/home", response_class=HTMLResponse, summary="首页 - 显示所有标签")
+@cache_view("home_page", ttl=1800)  # 缓存30分钟
 async def home_view(
     request: Request,
     page: int = Query(1, ge=1, description="页码"),
@@ -118,6 +120,7 @@ async def home_view(
         session.close()
 
 @router.get("/tag/{tag_id}", response_class=HTMLResponse, summary="标签详情页")
+@cache_view("tag_detail", ttl=2400)  # 缓存40分钟
 async def tag_detail_view(
     request: Request,
     tag_id: str,

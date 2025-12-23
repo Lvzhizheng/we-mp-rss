@@ -13,6 +13,7 @@ from apis.base import format_search_kw
 from core.lax.template_parser import TemplateParser
 from views.config import base
 from driver.wxarticle import Web
+from core.cache import cache_view, clear_cache_pattern
 def process_content_images(content: str) -> str:
     """处理文章内容中的图片链接，添加前缀"""
     if not content:
@@ -23,6 +24,7 @@ def process_content_images(content: str) -> str:
 router = APIRouter(tags=["文章"])
 
 @router.get("/articles", response_class=HTMLResponse, summary="文章列表页")
+@cache_view("articles_list", ttl=1800)  # 缓存30分钟
 async def articles_view(
     request: Request,
     page: int = Query(1, ge=1, description="页码"),
@@ -200,6 +202,7 @@ async def articles_view(
         session.close()
 
 @router.get("/article/{article_id}", response_class=HTMLResponse, summary="文章详情页")
+@cache_view("article_detail", ttl=3600)  # 缓存1小时
 async def article_detail_view(
     request: Request,
     article_id: str

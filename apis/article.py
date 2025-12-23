@@ -8,6 +8,7 @@ from .base import success_response, error_response
 from core.config import cfg
 from apis.base import format_search_kw
 from core.print import print_warning, print_info, print_error, print_success
+from core.cache import clear_cache_pattern
 router = APIRouter(prefix=f"/articles", tags=["文章管理"])
 
 
@@ -28,6 +29,11 @@ async def clean_orphan_articles(
             .delete(synchronize_session=False)
         
         session.commit()
+        
+        # 清除相关缓存
+        clear_cache_pattern("articles_list")
+        clear_cache_pattern("home_page")
+        clear_cache_pattern("tag_detail")
         
         return success_response({
             "message": "清理无效文章成功",
@@ -68,6 +74,11 @@ async def toggle_article_read_status(
         # 更新阅读状态
         article.is_read = 1 if is_read else 0
         session.commit()
+        
+        # 清除相关缓存
+        clear_cache_pattern("articles_list")
+        clear_cache_pattern("article_detail")
+        clear_cache_pattern("tag_detail")
         
         return success_response({
             "message": f"文章已标记为{'已读' if is_read else '未读'}",
