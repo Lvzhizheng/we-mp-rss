@@ -8,7 +8,9 @@
     <!-- 公众号信息 -->
     <div class="mp-info">
         <div style="width: 48px; height: 48px; background: #e9ecef; border-radius: 4px; display: flex; align-items: center; justify-content: center;">
-            📱
+            {% if article.mp_cover %}
+                <img src="{{article.mp_cover}}" alt="{{article.title}}" width="50px"/>
+            {% endif %}
         </div>
         <div style="flex: 1;">
             <div style="font-weight: 500; font-size: 1.1rem;">{{article.mp_name}}</div>
@@ -26,11 +28,7 @@
         </div>
     </div>
     
-    {% if article.pic_url %}
-    <div style="text-align: center; margin-bottom: 1rem;">
-        <img src="{{article.pic_url}}" alt="{{article.title}}" style="max-width: 100%; max-height: 400px; object-fit: cover; border-radius: 8px;">
-    </div>
-    {% endif %}
+  
     
     {% if article.description %}
     <div style="background: #f8f9fa; padding: 1rem; border-radius: 4px; border-left: 4px solid #667eea; margin-bottom: 1rem;">
@@ -40,7 +38,7 @@
 </div>
 <!-- 文章内容 -->
 <div class="article-content">
-    <div style="text-align: center; padding: 2rem;">
+    <div style="text-align: center;">
         <p class="text-muted mt-2"> {{article.content}}</p>
         <p style="margin-top: 1rem;">
             <a href="{{article.url}}" target="_blank" class="btn" rel="noopener noreferrer">

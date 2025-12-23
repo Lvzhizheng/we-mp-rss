@@ -437,6 +437,42 @@ class WXArticleFetcher:
         except Exception as e:
             print_error(f"修复图片失败: {str(e)}")
         return content
+    def get_image_url(self,url:str)->str:
+        base_url=cfg.get("server.base_url","")
+        return f"{base_url}/static/res/logo/{url}" 
+    def get_description(self,content:str,length:int=200)->str:
+        soup = BeautifulSoup(content, 'html.parser')
+            # 找到内容
+        js_content_div = soup
+        if js_content_div is None:
+            return ""
+        content = js_content_div.get_text().strip().strip("\n").replace("\n"," ").replace("\r"," ")
+        return content[:length]+"..." if len(content)>length else content
+
+    def proxy_images(self,content:str)->str:
+        try:
+            soup = BeautifulSoup(content, 'html.parser')
+            # 找到内容
+            js_content_div = soup
+            # 移除style属性中的visibility: hidden;
+            if js_content_div is None:
+                return ""
+            js_content_div.attrs.pop('style', None)
+            # 找到所有的img标签
+            img_tags = js_content_div.find_all('img')
+            # 遍历每个img标签并修改属性，设置宽度为1080p
+            for img_tag in img_tags:
+                if 'src' in img_tag.attrs:
+                    img_tag['src'] = self.get_image_url(img_tag['src'])
+                if 'style' in img_tag.attrs:
+                    style = img_tag['style']
+                    # 使用正则表达式替换width属性
+                    style = re.sub(r'width\s*:\s*\d+\s*px', 'width: 100%', style)
+                    img_tag['style'] = style
+            return  js_content_div.prettify()
+        except Exception as e:
+            print_error(f"Proxy图片失败: {str(e)}")
+        return content
    
     def clean_article_content(self,html_content: str):
         from tools.html import htmltools

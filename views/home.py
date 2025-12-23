@@ -60,7 +60,7 @@ async def home_view(
             tag_data = {
                 "id": tag.id,
                 "name": tag.name,
-                "cover": tag.cover,
+                "cover": Web.get_image_url(tag.cover) if tag.cover else "",
                 "intro": tag.intro,
                 "mp_count": mp_count,
                 "article_count": article_count,

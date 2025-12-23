@@ -3,6 +3,7 @@ from fastapi.responses import HTMLResponse
 from typing import Optional
 import os
 from datetime import datetime
+import re
 
 from core.db import DB
 from core.models.article import Article
@@ -11,6 +12,13 @@ from core.models.tags import Tags
 from apis.base import format_search_kw
 from core.lax.template_parser import TemplateParser
 from views.config import base
+from driver.wxarticle import Web
+def process_content_images(content: str) -> str:
+    """处理文章内容中的图片链接，添加前缀"""
+    if not content:
+        return content
+    return Web.proxy_images(content)
+
 # 创建路由器
 router = APIRouter(tags=["文章"])
 
@@ -81,11 +89,13 @@ async def articles_view(
         # 处理文章数据
         article_list = []
         for article, feed in articles:
+            processed_content = process_content_images(article.content or "")
+            content_display = processed_content[:200] + "..." if processed_content and len(processed_content) > 200 else processed_content
             article_data = {
                 "id": article.id,
                 "title": article.title,
                 "description": article.description,
-                "pic_url": article.pic_url,
+                "pic_url": Web.get_image_url(article.pic_url),
                 "url": article.url,
                 "publish_time": datetime.fromtimestamp(article.publish_time).strftime('%Y-%m-%d %H:%M') if article.publish_time else "",
                 "created_at": article.created_at.strftime('%Y-%m-%d %H:%M') if article.created_at else "",
@@ -93,7 +103,7 @@ async def articles_view(
                 "mp_id": article.mp_id,
                 "mp_cover": feed.mp_cover if feed else "",
                 "is_read": bool(article.is_read),
-                "content": article.content[:200] + "..." if article.content and len(article.content) > 200 else (article.content or "")
+                "content": content_display
             }
             article_list.append(article_data)
         
@@ -226,8 +236,8 @@ async def article_detail_view(
             rel_data = {
                 "id": rel_article.id,
                 "title": rel_article.title,
-                "description": rel_article.description,
-                "pic_url": rel_article.pic_url,
+                "description": rel_article.description or Web.get_description(rel_article.content),
+                "pic_url": Web.get_image_url(rel_article.pic_url),
                 "publish_time": datetime.fromtimestamp(rel_article.publish_time).strftime('%Y-%m-%d %H:%M') if rel_article.publish_time else ""
             }
             related_list.append(rel_data)
@@ -236,15 +246,15 @@ async def article_detail_view(
         article_data = {
             "id": article.id,
             "title": article.title,
-            "description": article.description,
-            "pic_url": article.pic_url,
+            "description": article.description or Web.get_description(article.content),
+            "pic_url": Web.get_image_url(rel_article.pic_url),
             "url": article.url,
             "publish_time": datetime.fromtimestamp(article.publish_time).strftime('%Y-%m-%d %H:%M') if article.publish_time else "",
             "created_at": article.created_at.strftime('%Y-%m-%d %H:%M') if article.created_at else "",
-            "content": article.content or "",
+            "content": process_content_images(article.content or ""),
             "mp_name": feed.mp_name if feed else "未知公众号",
             "mp_id": article.mp_id,
-            "mp_cover": feed.mp_cover if feed else "",
+            "mp_cover": Web.get_image_url(feed.mp_cover) if feed else "",
             "mp_intro": feed.mp_intro if feed else ""
         }
         
