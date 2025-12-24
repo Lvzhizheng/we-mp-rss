@@ -1,5 +1,7 @@
 from math import e
-from fastapi import Request, Query
+from fastapi import APIRouter, Request, Depends, Query, HTTPException
+from core.lax.template_parser import TemplateParser
+from fastapi.responses import HTMLResponse
 from core.db import DB
 from core.models.feed import Feed
 from core.models.article import Article
@@ -157,3 +159,25 @@ def get_tags_view(
     finally:
         session.close()
     return data
+
+def _render_template_with_error(template_path: str, error_msg: str, breadcrumb: list) -> HTMLResponse:
+    """渲染错误页面的辅助函数"""
+    try:
+        with open(template_path, 'r', encoding='utf-8') as f:
+            template_content = f.read()
+        
+        parser = TemplateParser(template_content, template_dir=base.public_dir)
+        html_content = parser.render({
+            "site": base.site,
+            "error": error_msg,
+            "breadcrumb": breadcrumb
+        })
+        return HTMLResponse(content=html_content)
+    except Exception:
+        return HTMLResponse(content=f"<h1>系统错误</h1><p>{error_msg}</p>")
+
+def process_content_images(content: str) -> str:
+    """处理文章内容中的图片链接，添加前缀"""
+    if not content:
+        return content
+    return Web.proxy_images(content)
