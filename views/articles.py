@@ -186,10 +186,7 @@ async def articles_view(
         has_next = page < total_pages
         
         # 构建面包屑
-        breadcrumb = [
-            {"name": "首页", "url": "/views/home"},
-            {"name": "文章列表", "url": None}
-        ]
+        breadcrumb = [{"name": "文章列表", "url": "/views/articles"}]
         
         # 读取模板文件
         template_path = base.articles_template
@@ -232,7 +229,7 @@ async def articles_view(
         return _render_template_with_error(
             base.articles_template,
             f"加载数据时出现错误: {str(e)}",
-            [{"name": "首页", "url": "/views/home"}, {"name": "文章列表", "url": None}]
+            [{"name": "文章列表", "url": "/views/articles"}]
         )
     finally:
         session.close()

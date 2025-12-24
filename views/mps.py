@@ -18,7 +18,7 @@ router = APIRouter(tags=["公众号"])
 
 @router.get("/mps", response_class=HTMLResponse, summary="公众号 - 显示所有公众号")
 @cache_view("mps_page", ttl=1800)  # 缓存30分钟
-async def home_view(
+async def mps_view(
     request: Request,
     page: int = Query(1, ge=1, description="页码"),
     limit: int = Query(12, ge=1, le=50, description="每页数量")
@@ -72,7 +72,7 @@ async def home_view(
         ]
         
         # 读取模板文件
-        template_path = base.home_template
+        template_path = base.mps_template
         with open(template_path, 'r', encoding='utf-8') as f:
             template_content = f.read()
         
