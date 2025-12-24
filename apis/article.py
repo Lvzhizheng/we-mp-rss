@@ -9,6 +9,7 @@ from core.config import cfg
 from apis.base import format_search_kw
 from core.print import print_warning, print_info, print_error, print_success
 from core.cache import clear_cache_pattern
+from tools.fix import fix_html
 router = APIRouter(prefix=f"/articles", tags=["文章管理"])
 
 
@@ -206,6 +207,7 @@ async def get_article_detail(
                     message="文章不存在"
                 )
             )
+        article.content=fix_html(article.content)
         return success_response(article)
     except HTTPException as e:
         raise e
@@ -288,7 +290,7 @@ async def get_next_article(
                     message="没有下一篇文章"
                 )
             )
-        
+        next_article.content=fix_html(next_article.content)
         return success_response(next_article)
     except HTTPException as e:
         raise e
@@ -335,7 +337,7 @@ async def get_prev_article(
                     message="没有上一篇文章"
                 )
             )
-        
+        prev_article.content=fix_html(prev_article.content)
         return success_response(prev_article)
     except HTTPException as e:
         raise e
