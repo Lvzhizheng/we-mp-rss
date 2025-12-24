@@ -37,7 +37,7 @@
         .btn-secondary { background: #6c757d; }
         .btn-secondary:hover { background: #5a6268; }
         .text-center { text-align: center; }
-        .text-muted { color: #6c757d; }
+        .text-muted { color: #6c757d; font-size:.8rem;}
         .mt-2 { margin-top: 0.5rem; }
         .mb-2 { margin-bottom: 0.5rem; }
         .mb-4 { margin-bottom: 1rem; }
@@ -84,10 +84,9 @@
             </div>
         </div>
     </header>
-
     <main>
-        <div class="container">
-            {{breadcrumb}}
+         <div class="container">
+           {% include "includes/breadcrumb.html" %}
             {% if error %}
             <div style="background: #f8d7da; color: #721c24; padding: 1rem; border-radius: 4px; margin-bottom: 2rem;">
                 <strong>错误：</strong> {{error}}

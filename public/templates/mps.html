@@ -1,5 +1,4 @@
 {%include "includes/header.html" %}
-abcccc
 {% if feeds %}
 <div class="grid grid-3">
     {% for feed in feeds %}
@@ -11,22 +10,18 @@ abcccc
             {% endif %}
         </div>
         <div style="display: flex; justify-content: space-between; align-items: center;">
-            <h3 style="text-align: center;width:100%;"><a href="/views/feed/{{feed.id}}">{{feed.name}}</a></h3>
+            <h3 style="text-align: center;width:100%;"><a href="/views/articles?mp_id={{feed.id}}">{{feed.name}}</a></h3>
         </div>
         <div style="margin: 1rem 0;">
-            <span
-                style="background: #eeeff0; padding: 0.25rem 0.5rem; border-radius: 12px; font-size: 0.8rem; margin-right: 0.5rem;">
-                📺 {{feed.mp_count}} 个公众号
-            </span>
-            <span style="background: #eeeff0; padding: 0.25rem 0.5rem; border-radius: 12px; font-size: 0.8rem;">
+            <span style="font-size: 0.8rem;text-align: center;display: block;">
                 📄 {{feed.article_count}} 篇文章
             </span>
         </div>
-    <p class="text-muted">{{feed.intro or "暂无简介"}}</p>
+    <p class="text-muted">{% if feed.intro %}{% if len(feed.intro) > 50 %}{{feed.intro.slice(0, 50)}}...{% else %}{{feed.intro}}{% endif %}{% else %}暂无简介{% endif %}</p>
     </div>
     {% endfor %}
 </div>
 
-{% include "includes/pagination.html" with context %}
+{% include "includes/pagination.html"%}
 
 {% include "includes/footer.html" %}
