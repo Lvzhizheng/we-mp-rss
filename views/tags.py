@@ -208,7 +208,6 @@ async def tag_detail_view(
         
         # 构建面包屑
         breadcrumb = [
-            {"name": "首页", "url": "/views/home"},
             {"name": tag.name, "url": None}
         ]
         

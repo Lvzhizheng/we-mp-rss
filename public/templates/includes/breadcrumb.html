@@ -4,7 +4,10 @@
                                首页/
                 </a>
                     {% for item in breadcrumb %}
-                            <span  style="color: #363434;text-decoration: none;transition: color 0.3s; " >{{ item.name }}</span>
+                    <span  style="color: #363434;text-decoration: none;transition: color 0.3s; " >{{ item.name }}</span>
+                        {% if not loop.last %}
+                        /
+                        {% endif %}
                     {% endfor %}
             </div>
 {% endif %}

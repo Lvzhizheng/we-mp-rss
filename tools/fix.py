@@ -1,6 +1,5 @@
-from attr import has
-
-
+import copy
+from core.models.article import Article
 def fix_html(content:str):
     from core.content_format import format_content
     from tools.mdtools.md2html import convert_markdown_to_html
@@ -10,6 +9,6 @@ def fix_html(content:str):
     content=convert_markdown_to_html(content)
     return content
 def fix_article(article):
-    art=article.copy()
-    art.content=fix_html(art.content)
+    art=article.to_dict()
+    art['content']=fix_html(art['content'])
     return art
