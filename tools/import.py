@@ -6,9 +6,10 @@
 使用方法: python tools/import.py
 输出: data/processed_output.txt
 """
-
+import random
 import os
 import sys
+from time import sleep
 
 # 添加项目根目录到Python路径
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -85,6 +86,7 @@ def import_mps(data_file:str="data/data.txt"):
         success_count = 0
         skip_count = 0
         error_count = 0
+        failed_list = []  # 记录失败的账号
         
         for result in results:
             mp_name = result.split('|')[0].strip() if '|' in result else result.strip()
@@ -92,23 +94,28 @@ def import_mps(data_file:str="data/data.txt"):
             try:
                 # 搜索公众号
                 print(f"正在搜索: {mp_name}")
-                search_result = search_Biz(mp_name, limit=1, offset=0)
+                # 检查是否已存在
+                existing_feed = session.query(Feed).filter(Feed.mp_name == mp_name).first()
                 
+                if existing_feed:
+                    print(f"  → 已存在，跳过: {mp_name}")
+                    skip_count += 1
+                    continue
+                search_result = search_Biz(mp_name, limit=1, offset=0)
+                mp_info=None
                 if search_result and 'list' in search_result and len(search_result['list']) > 0:
-                    mp_info = search_result['list'][0]
-                    
+                    for item in search_result['list']:
+                        print(item)
+                        if item.get("nickname") == mp_name:
+                            mp_info = item
+                    if mp_info is None:
+                        raise ValueError(f"未找到公众号信息: {mp_name}")
                     # 提取公众号信息
                     mp_id = mp_info.get('fakeid', '')
                     mp_cover = mp_info.get('round_head_img', '')
                     mp_intro = mp_info.get('signature', '')
                     
-                    # 检查是否已存在
-                    existing_feed = session.query(Feed).filter(Feed.faker_id == mp_id).first()
                     
-                    if existing_feed:
-                        print(f"  → 已存在，跳过: {mp_name}")
-                        skip_count += 1
-                        continue
                     
                     # 解码mp_id
                     mpx_id = base64.b64decode(mp_id).decode("utf-8")
@@ -133,19 +140,34 @@ def import_mps(data_file:str="data/data.txt"):
                     success_count += 1
                     
                     # 添加延迟避免频繁请求
-                    time.sleep(0.5)
+                    time.sleep(random.randint(1, 3))
                 else:
                     print(f"  ✗ 未找到: {mp_name}")
+                    failed_list.append(mp_name)
                     error_count += 1
                     
             except Exception as e:
                 print(f"  ✗ 处理失败 {mp_name}: {str(e)}")
+                failed_list.append(f"{mp_name} (错误: {str(e)})")
                 error_count += 1
                 session.rollback()
+                if "frequencey control" in str(e):
+                    sleep(random.randint(5, 10))
         
         print("\n" + "=" * 50)
         print(f"导入完成: 成功 {success_count} 条，跳过 {skip_count} 条，失败 {error_count} 条")
         print("=" * 50)
+
+        # 保存失败列表到文件
+        if failed_list:
+            failed_file = "data/failed_accounts.txt"
+            with open(failed_file, 'w', encoding='utf-8') as f:
+                f.write("导入失败的账号列表\n")
+                f.write("=" * 50 + "\n")
+                for idx, account in enumerate(failed_list, 1):
+                    f.write(f"{idx}. {account}\n")
+            print(f"\n失败列表已保存到: {failed_file}")
+            print(f"共 {len(failed_list)} 个失败账号")
         
     else:
         print("未生成任何结果")
