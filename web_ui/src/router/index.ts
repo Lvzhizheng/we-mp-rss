@@ -145,6 +145,15 @@ const routes = [
           permissions: ['tag:edit'] 
         }
       },
+      {
+        path: 'access-keys',
+        name: 'AccessKeyManagement',
+        component: () => import('@/views/AccessKeyManagement.vue'),
+        meta: { 
+          requiresAuth: true,
+          permissions: ['admin'] 
+        }
+      },
     ]
   },
   {

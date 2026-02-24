@@ -2,16 +2,18 @@ from datetime import datetime, timedelta
 import jwt
 import bcrypt
 from functools import wraps
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordBearer
 from typing import Optional
 from core.models import User as DBUser
 from core.config import  cfg,API_BASE
 from sqlalchemy.orm import Session
-from core.models import User
+from core.models import User, AccessKey
 import core.db  as db
 from passlib.context import CryptContext
 import json
+import secrets
+import hashlib
 
 DB=db.Db(tag="用户连接")
 SECRET_KEY = cfg.get("secret","csol2025")  # 生产环境应使用更安全的密钥
@@ -49,6 +51,30 @@ _user_cache = {}
 # 登录失败次数记录
 _login_attempts = {}
 MAX_LOGIN_ATTEMPTS = 5
+
+
+# ===== Access Key (AK) 认证相关功能 =====
+
+def generate_access_key() -> tuple[str, str]:
+    """
+    生成 Access Key 和 Secret Key
+    返回: (access_key, secret_key)
+    """
+    # Access Key: 前缀 WK + 32位随机字符
+    access_key = "WK" + secrets.token_urlsafe(32)[:32]
+    # Secret Key: 前缀 SK + 32位随机字符
+    secret_key = "SK" + secrets.token_urlsafe(32)[:32]
+    return access_key, secret_key
+
+
+def hash_secret_key(secret_key: str) -> str:
+    """对 Secret Key 进行哈希处理"""
+    return hashlib.sha256(secret_key.encode()).hexdigest()
+
+
+def verify_secret_key(plain_secret: str, hashed_secret: str) -> bool:
+    """验证 Secret Key 是否匹配"""
+    return hashlib.sha256(plain_secret.encode()).hexdigest() == hashed_secret
 
 def get_login_attempts(username: str) -> int:
     """获取用户登录失败次数"""
@@ -165,17 +191,296 @@ def requires_role(role: str):
         return wrapper
     return decorator
 
-def requires_permission(permission: str):
-    """检查用户权限的装饰器"""
-    def decorator(func):
-        @wraps(func)
-        async def wrapper(*args, **kwargs):
-            current_user = kwargs.get('current_user')
-            if not current_user or permission not in current_user.get('permissions', []):
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail="Insufficient permissions"
-                )
-            return await func(*args, **kwargs)
-        return wrapper
-    return decorator
+def create_ak(
+    user_id: str,
+    name: str,
+    permissions: list = None,
+    description: str = "",
+    expires_in_days: Optional[int] = None
+) -> dict:
+    """
+    为用户创建 Access Key
+    
+    参数:
+        user_id: 用户ID
+        name: AK名称
+        permissions: 权限列表
+        description: 描述
+        expires_in_days: 过期天数(None表示不过期)
+    
+    返回: 包含AK信息的字典
+    """
+    from uuid import uuid4
+    
+    session = DB.get_session()
+    try:
+        access_key, secret_key = generate_access_key()
+        hashed_secret = hash_secret_key(secret_key)
+        
+        ak_id = str(uuid4())
+        expires_at = None
+        if expires_in_days:
+            expires_at = datetime.utcnow() + timedelta(days=expires_in_days)
+        
+        ak = AccessKey(
+            id=ak_id,
+            user_id=user_id,
+            key=access_key,
+            secret=hashed_secret,
+            name=name,
+            description=description,
+            permissions=json.dumps(permissions or []),
+            is_active=True,
+            expires_at=expires_at
+        )
+        
+        session.add(ak)
+        session.commit()
+        session.refresh(ak)
+        
+        return {
+            "id": ak.id,
+            "key": access_key,
+            "secret": secret_key,  # 只在创建时返回一次
+            "name": name,
+            "description": description,
+            "permissions": permissions or [],
+            "is_active": True,
+            "created_at": ak.created_at.isoformat() if ak.created_at else None,
+            "expires_at": ak.expires_at.isoformat() if ak.expires_at else None
+        }
+    except Exception as e:
+        session.rollback()
+        from core.print import print_error
+        print_error(f"创建Access Key错误: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="创建Access Key失败"
+        )
+    finally:
+        session.close()
+
+
+def get_ak_by_key(access_key: str) -> Optional[AccessKey]:
+    """通过 AK 值获取 AK 记录"""
+    session = DB.get_session()
+    try:
+        ak = session.query(AccessKey).filter(
+            AccessKey.key == access_key,
+            AccessKey.is_active == True
+        ).first()
+        return ak
+    except Exception as e:
+        from core.print import print_error
+        print_error(f"获取Access Key错误: {str(e)}")
+        return None
+    finally:
+        session.close()
+
+
+def authenticate_ak(access_key: str, secret_key: str) -> Optional[dict]:
+    """
+    验证 AK/SK 凭证
+    
+    参数:
+        access_key: Access Key
+        secret_key: Secret Key
+    
+    返回: 用户信息或 None
+    """
+    ak = get_ak_by_key(access_key)
+    
+    if not ak or not ak.is_valid():
+        return None
+    
+    if not verify_secret_key(secret_key, ak.secret):
+        return None
+    
+    # 获取关联的用户信息
+    user = get_user(ak.user_id.split('_')[0] if '_' in ak.user_id else ak.user_id)
+    
+    if not user:
+        return None
+    
+    # 更新最后使用时间
+    session = DB.get_session()
+    try:
+        ak_record = session.query(AccessKey).filter(AccessKey.id == ak.id).first()
+        if ak_record:
+            ak_record.last_used_at = datetime.utcnow()
+            session.commit()
+    except:
+        session.rollback()
+    finally:
+        session.close()
+    
+    # 解析权限
+    try:
+        ak_permissions = json.loads(ak.permissions) if ak.permissions else []
+    except:
+        ak_permissions = []
+    
+    return {
+        "username": user.username,
+        "user_id": ak.user_id,
+        "access_key_id": ak.id,
+        "access_key_name": ak.name,
+        "role": user.role,
+        "permissions": ak_permissions or user.permissions,  # 使用AK的权限或用户权限
+        "original_user": user,
+        "auth_type": "ak"  # 标记为 AK 认证
+    }
+
+
+async def get_current_user_or_ak(request: Request, token: str = Depends(oauth2_scheme)):
+    """
+    通用认证函数，支持 JWT Token 和 AK/SK 认证
+    
+    优先级:
+    1. Authorization 头中的 AK/SK (格式: "AK-SK ak_value:sk_value")
+    2. Bearer Token (JWT)
+    """
+    # 检查 AK/SK 认证
+    auth_header = request.headers.get("Authorization", "")
+    if auth_header.startswith("AK-SK "):
+        try:
+            credentials = auth_header[6:].strip()
+            if ':' in credentials:
+                ak, sk = credentials.split(':', 1)
+                user_info = authenticate_ak(ak, sk)
+                if user_info:
+                    return user_info
+        except:
+            pass
+    
+    # 回退到 JWT Token 认证
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username: str = payload.get("sub")
+        if username is None:
+            raise credentials_exception
+    except jwt.PyJWTError:
+        raise credentials_exception
+    
+    user = get_user(username)
+    
+    if user is None:
+        raise credentials_exception
+        
+    return {
+        "username": user.username,
+        "role": user.role,
+        "permissions": user.permissions,
+        "original_user": user,
+        "auth_type": "jwt"  # 标记为 JWT 认证
+    }
+
+
+def list_user_aks(user_id: str) -> list:
+    """获取用户的所有 Access Keys"""
+    session = DB.get_session()
+    try:
+        aks = session.query(AccessKey).filter(
+            AccessKey.user_id == user_id
+        ).all()
+        
+        result = []
+        for ak in aks:
+            ak_permissions = []
+            try:
+                ak_permissions = json.loads(ak.permissions) if ak.permissions else []
+            except:
+                pass
+            
+            result.append({
+                "id": ak.id,
+                "name": ak.name,
+                "key": ak.key,  # 返回完整的key供复制
+                "description": ak.description,
+                "permissions": ak_permissions,
+                "is_active": ak.is_active,
+                "is_expired": ak.is_expired(),
+                "created_at": ak.created_at.isoformat() if ak.created_at else None,
+                "updated_at": ak.updated_at.isoformat() if ak.updated_at else None,
+                "last_used_at": ak.last_used_at.isoformat() if ak.last_used_at else None,
+                "expires_at": ak.expires_at.isoformat() if ak.expires_at else None
+            })
+        
+        return result
+    except Exception as e:
+        from core.print import print_error
+        print_error(f"获取用户Access Keys错误: {str(e)}")
+        return []
+    finally:
+        session.close()
+
+
+def deactivate_ak(ak_id: str) -> bool:
+    """停用 Access Key"""
+    session = DB.get_session()
+    try:
+        ak = session.query(AccessKey).filter(AccessKey.id == ak_id).first()
+        if ak:
+            ak.is_active = False
+            session.commit()
+            return True
+        return False
+    except Exception as e:
+        session.rollback()
+        from core.print import print_error
+        print_error(f"停用Access Key错误: {str(e)}")
+        return False
+    finally:
+        session.close()
+
+
+def delete_ak(ak_id: str) -> bool:
+    """删除 Access Key"""
+    session = DB.get_session()
+    try:
+        ak = session.query(AccessKey).filter(AccessKey.id == ak_id).first()
+        if ak:
+            session.delete(ak)
+            session.commit()
+            return True
+        return False
+    except Exception as e:
+        session.rollback()
+        from core.print import print_error
+        print_error(f"删除Access Key错误: {str(e)}")
+        return False
+    finally:
+        session.close()
+
+
+def update_ak(ak_id: str, **kwargs) -> bool:
+    """更新 Access Key 信息"""
+    session = DB.get_session()
+    try:
+        ak = session.query(AccessKey).filter(AccessKey.id == ak_id).first()
+        if not ak:
+            return False
+        
+        # 允许更新的字段
+        allowed_fields = ['name', 'description', 'is_active', 'permissions', 'expires_at']
+        for field, value in kwargs.items():
+            if field in allowed_fields:
+                if field == 'permissions' and isinstance(value, list):
+                    value = json.dumps(value)
+                setattr(ak, field, value)
+        
+        ak.updated_at = datetime.utcnow()
+        session.commit()
+        return True
+    except Exception as e:
+        session.rollback()
+        from core.print import print_error
+        print_error(f"更新Access Key错误: {str(e)}")
+        return False
+    finally:
+        session.close()

@@ -23,6 +23,18 @@ from views import router as views_router
 import apis
 import os
 from core.config import cfg,VERSION,API_BASE
+from starlette.middleware.base import BaseHTTPMiddleware
+
+class AKMiddleware(BaseHTTPMiddleware):
+    """Access Key 认证中间件"""
+    async def dispatch(self, request: Request, call_next):
+        # 提取 Authorization 头
+        auth_header = request.headers.get("Authorization", "")
+        if auth_header.startswith("AK-SK "):
+            # 将AK/SK认证信息存储在 request state 中供后续使用
+            request.state.ak_auth = auth_header
+        response = await call_next(request)
+        return response
 
 app = FastAPI(
     title="WeRSS API",
@@ -52,6 +64,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# AK认证中间件
+app.add_middleware(AKMiddleware)
+
 @app.middleware("http")
 async def add_custom_header(request: Request, call_next):
     response = await call_next(request)

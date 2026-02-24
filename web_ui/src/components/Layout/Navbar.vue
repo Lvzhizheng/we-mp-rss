@@ -41,6 +41,12 @@
         </template>
         系统信息
       </a-menu-item>
+      <a-menu-item key="/access-keys">
+        <template #icon>
+          <icon-key />
+        </template>
+        Access Key
+      </a-menu-item>
        <!-- <a-menu-item key="/reader">
         <template #icon>
           <icon-read />

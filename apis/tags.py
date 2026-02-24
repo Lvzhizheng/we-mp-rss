@@ -6,7 +6,7 @@ from core.database import get_db
 from sqlalchemy.orm import Session
 from schemas.tags import Tags, TagsCreate
 from .base import success_response, error_response
-from core.auth import get_current_user, requires_permission
+from core.auth import get_current_user
 from core.cache import clear_cache_pattern
 
 # 标签管理API路由

@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from core.auth import get_current_user, requires_permission
+from core.auth import get_current_user
 from .base import success_response, error_response
 from core.cache import clear_cache_pattern, clear_all_cache
 
