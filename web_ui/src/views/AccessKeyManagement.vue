@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, reactive, onMounted, computed } from 'vue'
+import { ref, reactive, onMounted, computed, h } from 'vue'
 import { 
   createAccessKey, 
   listAccessKeys, 
@@ -94,11 +94,21 @@ const handleSubmit = async () => {
       if (res && res.secret) {
         Modal.info({
           title: '创建成功',
-          content: `请妥善保管 Secret Key，它只会显示一次！<br><br>Access Key: ${res.key}<br><br>Secret Key: ${res.secret}`,
+          content: h('div', [
+            h('p', '请妥善保管 Secret Key，它只会显示一次！'),
+            h('p', [h('strong', 'Access Key: '), res.key]),
+            h('p', [h('strong', 'Secret Key: '), res.secret]),
+          ]),
           okText: '我已记下',
-          innerHTML: true
+          onOk: () => {
+            navigator.clipboard.writeText(`Access Key: ${res.key}\nSecret Key: ${res.secret}`).then(() => {
+              Message.success('已复制到剪贴板')
+            }).catch(() => {
+              Message.error('复制失败')
+            })
+          }
         })
-        // showSecretKey.value = false
+        showSecretKey.value = false
       }
     } else if (selectedAK.value) {
       await updateAccessKey(selectedAK.value.id, {

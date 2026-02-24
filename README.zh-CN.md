@@ -212,6 +212,64 @@ http://localhost:3000
 2. 使用微信扫码授权后，即可添加和管理订阅。
 3. 定时任务会自动更新内容，并生成RSS订阅链接。
 
+## Access Key 认证
+
+WeRSS 支持使用 Access Key (AK) 进行 API 认证，适用于程序化访问和自动化脚本。
+
+### 创建 Access Key
+
+1. 登录 WeRSS 管理界面
+2. 进入"Access Key 管理"页面
+3. 点击"创建 Access Key"按钮
+4. 填写名称、描述、权限和过期时间
+5. 创建成功后，妥善保存 Access Key 和 Secret Key（Secret Key 只显示一次）
+
+### 使用 Access Key 调用 API
+
+在请求头中添加 `Authorization` 字段，格式为 `AK-SK {access_key}:{secret_key}`：
+
+```bash
+curl -H "Authorization: AK-SK your_access_key:your_secret_key" \
+     http://localhost:8001/api/feeds
+```
+
+#### Python 示例
+
+```python
+import requests
+
+access_key = "your_access_key"
+secret_key = "your_secret_key"
+base_url = "http://localhost:8001"
+
+headers = {
+    "Authorization": f"AK-SK {access_key}:{secret_key}"
+}
+
+# 获取订阅列表
+response = requests.get(f"{base_url}/api/feeds", headers=headers)
+print(response.json())
+```
+
+#### JavaScript 示例
+
+```javascript
+const accessKey = "your_access_key";
+const secretKey = "your_secret_key";
+const baseUrl = "http://localhost:8001";
+
+const headers = {
+  "Authorization": `AK-SK ${accessKey}:${secretKey}`
+};
+
+// 获取订阅列表
+fetch(`${baseUrl}/api/feeds`, { headers })
+  .then(res => res.json())
+  .then(data => console.log(data));
+```
+
+详细文档请参考：[AK 认证指南](docs/AK_Authentication_Guide.md)
+
 # 常见问题
 
 - **如何修改数据库连接？**
