@@ -162,7 +162,9 @@ async def articles_view(
         total_pages = (total + limit - 1) // limit
         has_prev = page > 1
         has_next = page < total_pages
-        
+        prev_page = page - 1 if has_prev else None
+        next_page = page + 1 if has_next else None
+
         # 构建面包屑
         breadcrumb = [{"name": "文章列表", "url": "/views/articles"}]
         
@@ -189,6 +191,9 @@ async def articles_view(
             "limit": limit,
             "has_prev": has_prev,
             "has_next": has_next,
+            "prev_page": prev_page,
+            "next_page": next_page,
+            "base_url": "/views/articles?mp_id={mp_id}&tag_id={tag_id}",
             "filter_info": filter_info,
             "tag_options": tag_options,
             "mp_options": mp_options,

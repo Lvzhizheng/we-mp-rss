@@ -28,6 +28,12 @@ async def mps_view(
             template_content = f.read()
 
         data['site'] = base.site
+        # 添加分页所需的额外字段
+        data['base_url'] = '/views/mps'
+        data['prev_page'] = page - 1 if data.get('has_prev') else page
+        data['next_page'] = page + 1 if data.get('has_next') else page
+        data['item_name'] = '个公众号'
+
         # 使用模板引擎渲染
         parser = TemplateParser(template_content, template_dir=base.public_dir)
         html_content = parser.render(data)

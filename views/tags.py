@@ -89,7 +89,7 @@ async def tags_view(
         
         # 使用模板引擎渲染
         parser = TemplateParser(template_content, template_dir=base.public_dir)
-        html_content = parser.render({
+        render_context = {
             "site": base.site,
             "tags": tag_list,
             "current_page": page,
@@ -98,8 +98,13 @@ async def tags_view(
             "limit": limit,
             "has_prev": has_prev,
             "has_next": has_next,
-            "breadcrumb": breadcrumb
-        })
+            "prev_page": page - 1 if has_prev else page,
+            "next_page": page + 1 if has_next else page,
+            "breadcrumb": breadcrumb,
+            "base_url": "/views/tags",
+            "item_name": "个标签"
+        }
+        html_content = parser.render(render_context)
         
         return HTMLResponse(content=html_content)
         

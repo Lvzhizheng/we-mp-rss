@@ -26,6 +26,7 @@
     </div>
     {% endfor %}
 </div>
-{% set base_url = "/views/tag/" %}
-{% include "includes/pagination.html" with context %}
+{% endif %}
+
+{% include "includes/pagination.html" %}
 {% include "includes/footer.html" %}
