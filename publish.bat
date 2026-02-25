@@ -1,5 +1,5 @@
 @echo off
-chcp 65001
+@chcp 65001
 
 REM 初始化参数标志
 set WEB_FLAG=0

@@ -241,7 +241,7 @@ async def get_mp_articles_source(
         rss_list = [{
             "id": str(article.id),
             "title": article.title or "",
-            "link":  f"{rss_domain}rss/feed/{article.id}" if cfg.get("rss.local",False) else article.url,
+            "link":  f"{rss_domain}/views/article/{article.id}" if cfg.get("rss.local",False) else article.url,
             "description": article.description if article.description != "" else article.title or "",
             "content": article.content or "",
             "image": article.pic_url or "",
