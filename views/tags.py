@@ -123,12 +123,12 @@ async def tags_view(
 
 
 @router.get("/tag/{tag_id}", response_class=HTMLResponse, summary="标签详情页")
-@cache_view("tag_detail", ttl=2400)  # 缓存40分钟
 async def tag_detail_view(
     request: Request,
     tag_id: str,
     page: int = Query(1, ge=1, description="页码"),
-    limit: int = Query(20, ge=1, le=100, description="每页文章数量")
+    limit: int = Query(20, ge=1, le=100, description="每页文章数量"),
+    keyword: Optional[str] = Query(None, description="搜索关键字")
 ):
     """
     显示标签详情和关联的文章列表
@@ -154,13 +154,21 @@ async def tag_detail_view(
         if mps_ids:
             mps_info = session.query(Feed).filter(Feed.id.in_(mps_ids)).all()
         
+        # 构建基础查询条件
+        base_conditions = [
+            Article.mp_id.in_(mps_ids),
+            Article.status == 1
+        ]
+        
+        # 添加关键字搜索条件
+        if keyword and keyword.strip():
+            search_term = f"%{keyword.strip()}%"
+            base_conditions.append(Article.title.like(search_term))
+        
         # 查询文章总数
         total = 0
         if mps_ids:
-            total = session.query(Article).filter(
-                Article.mp_id.in_(mps_ids),
-                Article.status == 1
-            ).count()
+            total = session.query(Article).filter(*base_conditions).count()
         
         # 计算偏移量
         offset = (page - 1) * limit
@@ -170,10 +178,7 @@ async def tag_detail_view(
         if mps_ids:
             articles_query = session.query(Article, Feed).join(
                 Feed, Article.mp_id == Feed.id
-            ).filter(
-                Article.mp_id.in_(mps_ids),
-                Article.status == 1
-            ).order_by(Article.publish_time.desc()).offset(offset).limit(limit).all()
+            ).filter(*base_conditions).order_by(Article.publish_time.desc()).offset(offset).limit(limit).all()
             
             for article, feed in articles_query:
                 article_data = {
@@ -212,7 +217,7 @@ async def tag_detail_view(
         ]
         
         # 读取模板文件
-        template_path = base.articles_template
+        template_path = base.tags_articles_template
         with open(template_path, 'r', encoding='utf-8') as f:
             template_content = f.read()
         
@@ -227,7 +232,12 @@ async def tag_detail_view(
             "limit": limit,
             "has_prev": has_prev,
             "has_next": has_next,
-            "breadcrumb": breadcrumb
+            "breadcrumb": breadcrumb,
+            "base_url": f"/views/tag/{tag_id}",
+            "item_name": "篇文章",
+            "keyword": keyword,
+            "prev_page": page - 1,
+            "next_page": page + 1
         })
         
         return HTMLResponse(content=html_content)
@@ -237,7 +247,7 @@ async def tag_detail_view(
     except Exception as e:
         print(f"获取标签详情错误: {str(e)}")
         # 读取模板文件
-        template_path = base.tag_template
+        template_path = base.tags_articles_template
         with open(template_path, 'r', encoding='utf-8') as f:
             template_content = f.read()
         

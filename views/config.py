@@ -8,6 +8,7 @@ class Config:
     mps_template = f"{base_path}/templates/mps.html"
     tags_template = f"{base_path}/templates/tags.html"
     tag_detail_template = f"{base_path}/templates/tag_detail.html"
+    tags_articles_template = f"{base_path}/templates/tags_articles.html"
     article_template = f"{base_path}/templates/article.html"
     article_detail_template = f"{base_path}/templates/article_detail.html"
     articles_template = f"{base_path}/templates/articles.html"

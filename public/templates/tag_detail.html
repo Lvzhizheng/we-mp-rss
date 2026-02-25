@@ -1,7 +1,5 @@
 {% include "includes/header.html" %}
 
-{% block title %}WeRSS - {{tag.name}}标签详情{% endblock %}
-
 {% include "includes/tag_style.html" %}
 {% if not error %}
 <!-- 面包屑导航 -->
@@ -15,7 +13,6 @@
         {% if not loop.last %} / {% endif %}
     {% endfor %}
 </div>
-
 <!-- 标签信息头部 -->
 <div class="card">
     <div class="tag-header">
@@ -38,7 +35,21 @@
 <!-- 文章列表 -->
 {% if articles %}
 <div class="card">
-    <h2>📄 最新文章</h2>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h2 style="margin: 0;">📄 最新文章</h2>
+        <form method="get" action="/views/tag/{{tag.id}}" style="display: flex; align-items: center; gap: 10px;">
+            <input type="text" name="keyword" placeholder="搜索文章标题..." value="{{keyword or ''}}" 
+                   style="padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px; min-width: 200px;">
+            <button type="submit" style="padding: 8px 16px; background: #667eea; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                🔍 搜索
+            </button>
+            {% if keyword %}
+            <a href="/views/tag/{{tag.id}}" style="padding: 8px 16px; background: #6c757d; color: white; text-decoration: none; border-radius: 4px;">
+                清除
+            </a>
+            {% endif %}
+        </form>
+    </div>
     
     {% for article in articles %}
     <div class="article-item">

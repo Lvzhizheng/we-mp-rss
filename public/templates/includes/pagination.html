@@ -2,17 +2,17 @@
 <div class="pagination-container">
     <div class="pagination-wrapper">
         {% if has_prev %}
-        <a href="{{base_url}}?page={{=current_page - 1}}&limit={{limit}}" class="btn btn-secondary">« 上一页</a>
+        <a href="{{base_url}}?page={{prev_page}}&limit={{limit}}{% if keyword %}&keyword={{keyword}}{% endif %}" class="btn btn-secondary">« 上一页</a>
         {% endif %}
-        
+
         <div class="pagination-info">
             <span>第 {{current_page}} 页</span>
             <span class="pagination-total">共 {{total_pages}} 页</span>
             <span class="pagination-items">{{total_items}} {{item_name}}</span>
         </div>
-        
+
         {% if has_next %}
-        <a href="{{base_url}}?page={{=current_page + 1}}&limit={{limit}}" class="btn btn-secondary">下一页 »</a>
+        <a href="{{base_url}}?page={{next_page}}&limit={{limit}}{% if keyword %}&keyword={{keyword}}{% endif %}" class="btn btn-secondary">下一页 »</a>
         {% endif %}
     </div>
 </div>
