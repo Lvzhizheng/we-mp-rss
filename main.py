@@ -57,7 +57,7 @@ if __name__ == '__main__':
         print_success("已开启定时任务")
     else:
         print_warning("未开启定时任务")
-    if cfg.get("gather.auto_fetch_article",False):
+    if cfg.get("gather.content_auto_check",False):
         from jobs import start_fix_article
         start_fix_article()
         print_success("已开启自动修正文章任务")
