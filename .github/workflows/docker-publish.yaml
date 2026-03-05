@@ -12,7 +12,7 @@ on:
       - 'Dockerfile'
       - 'requirements.txt'
       - 'config.example.yaml'
-      - 'static/index.html'
+      - 'static'
 #   release:
 #     types: [published]
 jobs:
