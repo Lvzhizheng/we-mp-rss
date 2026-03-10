@@ -209,6 +209,9 @@ class Wx:
                 raise Exception(f"登录已经失效，请重新登录")
         except Exception as e:
             raise Exception(f"浏览器关闭")  # 重新抛出异常以便外部捕获处理
+    def QrStatus(self):
+        return {"login_status":self.HasLogin(),"qr_code":self.GetHasCode()}
+
     def HasLogin(self):
         with self._login_lock:
             return self._haslogin
@@ -378,6 +381,7 @@ class Wx:
         except Exception as e:
             if "Timeout" in str(e):
                 print_warning("\n扫码登录超时，请重新运行程序进行扫码登录")
+
             else:
                 print_error(f"\n错误发生: {str(e)}")
             self.SESSION=None

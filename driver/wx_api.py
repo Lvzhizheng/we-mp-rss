@@ -921,6 +921,8 @@ class WeChatAPI:
             return True
         except:
             return False
+    def QrStatus(self):
+        return {"login_status":self.HasLogin(),"qr_code":self.GetHasCode()}
     def HasLogin(self):
         return self._islogin and not self.GetHasCode()
     def Close(self):
