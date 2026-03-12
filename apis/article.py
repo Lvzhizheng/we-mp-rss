@@ -420,7 +420,7 @@ async def get_refresh_task_status(
 
 
 @router.get("/{article_id}", summary="获取文章详情")
-async def get_article_detail(
+def get_article_detail(
     article_id: str,
     content: bool = Query(False),
     # current_user: dict = Depends(get_current_user)
@@ -443,7 +443,9 @@ async def get_article_detail(
                 preferred_mode=cfg.get("gather.content_mode", "web"),
             )
             if updated:
+                clear_cache_pattern("articles_list")
                 clear_cache_pattern("article_detail")
+                clear_cache_pattern("home_page")
                 clear_cache_pattern("tag_detail")
         return success_response(fix_article(article))
     except HTTPException as e:
@@ -494,7 +496,7 @@ async def delete_article(
         )
 
 @router.get("/{article_id}/next", summary="获取下一篇文章")
-async def get_next_article(
+def get_next_article(
     article_id: str,
     content: bool = Query(False),
     current_user: dict = Depends(get_current_user_or_ak)
@@ -535,7 +537,9 @@ async def get_next_article(
                 preferred_mode=cfg.get("gather.content_mode", "web"),
             )
             if updated:
+                clear_cache_pattern("articles_list")
                 clear_cache_pattern("article_detail")
+                clear_cache_pattern("home_page")
                 clear_cache_pattern("tag_detail")
         return success_response(fix_article(next_article))
     except HTTPException as e:
@@ -550,7 +554,7 @@ async def get_next_article(
         )
 
 @router.get("/{article_id}/prev", summary="获取上一篇文章")
-async def get_prev_article(
+def get_prev_article(
     article_id: str,
     content: bool = Query(False),
     current_user: dict = Depends(get_current_user_or_ak)
@@ -591,7 +595,9 @@ async def get_prev_article(
                 preferred_mode=cfg.get("gather.content_mode", "web"),
             )
             if updated:
+                clear_cache_pattern("articles_list")
                 clear_cache_pattern("article_detail")
+                clear_cache_pattern("home_page")
                 clear_cache_pattern("tag_detail")
         return success_response(fix_article(prev_article))
     except HTTPException as e:

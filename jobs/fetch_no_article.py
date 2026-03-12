@@ -16,12 +16,17 @@ def fetch_articles_without_content():
         from sqlalchemy import or_
         articles = session.query(Article).filter(
             or_(Article.content.is_(None), Article.content == ""),
-            Article.status != DATA_STATUS.FETCHING  # 排除正在获取的文章
+            Article.status != DATA_STATUS.FETCHING,  # 排除正在获取的文章
+            Article.status != DATA_STATUS.DELETED  # 已删除文章不再参与自动补抓
         ).limit(10).all()
         
         if not articles:
             print_warning("暂无需要获取内容的文章")
             return
+
+        original_status_map = {
+            article.id: article.status for article in articles
+        }
         
         # 锁定文章状态，防止其他节点获取
         article_ids = [a.id for a in articles]
@@ -49,13 +54,13 @@ def fetch_articles_without_content():
                         print_success(f"成功更新文章 {article.title} 的内容, mode={fetch_mode}")
                 else:
                     # 获取失败，恢复状态以便后续重试
-                    article.status = DATA_STATUS.ACTIVE
+                    article.status = original_status_map.get(article.id, DATA_STATUS.ACTIVE)
                     session.commit()
                     print_error(f"获取文章 {article.title} 内容失败, mode={fetch_mode}")
                 Wait(min=5,max=10,tips=f"修正 {article.title}... 完成")
             except Exception as e:
                 # 单篇文章处理失败，恢复状态
-                article.status = DATA_STATUS.ACTIVE
+                article.status = original_status_map.get(article.id, DATA_STATUS.ACTIVE)
                 session.commit()
                 print_error(f"处理文章 {article.title} 时发生错误: {e}")
     except Exception as e:
