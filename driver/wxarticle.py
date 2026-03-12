@@ -26,6 +26,9 @@ class WXArticleFetcher:
         """初始化文章获取器"""
         self.wait_timeout = wait_timeout
         self.controller = PlaywrightController()
+        self.browser_proxy_url = ""
+        if cfg.get("proxy.enabled", False):
+            self.browser_proxy_url = cfg.get("proxy.http_url", "")
         if not self.controller:
             raise Exception("WebDriver未初始化或未登录")
     
@@ -249,6 +252,7 @@ class WXArticleFetcher:
                 "publish_time": "",
                 "content": "",
                 "images": "",
+                "fetch_error": "",
                 "mp_info":{
                 "mp_name":"",   
                 "logo":"",
@@ -256,7 +260,7 @@ class WXArticleFetcher:
                 }
             }
         try:
-            self.controller.start_browser()
+            self.controller.start_browser(proxy_url=self.browser_proxy_url)
         
             self.page = self.controller.page
             if cfg.get("proxy.deno_url","")!="" and cfg.get("proxy.enabled",False):
@@ -361,6 +365,7 @@ class WXArticleFetcher:
             info["topic_image"]=topic_image
 
         except Exception as e:
+            info["fetch_error"] = str(e)
             print_error(f"文章内容获取失败: {str(e)}")
             body_preview = body[:50] if 'body' in dir() else "N/A"
             print_warning(f"页面内容预览: {body_preview}...")

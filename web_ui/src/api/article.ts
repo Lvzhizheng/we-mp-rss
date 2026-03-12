@@ -13,7 +13,7 @@ import http from './http'
  * @property is_read 阅读状态
  */
 export interface Article {
-  id: number
+  id: number | string
   title: string
   content: string
   mp_name: string
@@ -22,6 +22,7 @@ export interface Article {
   link: string
   created_at: string
   is_read?: number
+  is_favorite?: number
 }
 
 /**
@@ -41,6 +42,7 @@ export interface ArticleListParams {
   status?: number
   mp_id?: string
   has_content?: boolean
+  only_favorite?: boolean
 }
 
 /**
@@ -66,10 +68,11 @@ export const getArticles = (params: ArticleListParams) => {
     search: params.search,
     status: params.status,
     mp_id: params.mp_id,
-    has_content: params.has_content
+    has_content: params.has_content,
+    only_favorite: params.only_favorite
   }
-  return http.get<ArticleListResult>('/wx/articles', { 
-    params: apiParams 
+  return http.get<ArticleListResult>('/wx/articles', {
+    params: apiParams
   })
 }
 
@@ -119,8 +122,26 @@ export const getNextArticleDetail = (id: number) => {
  * @param id 文章ID
  * @returns 删除结果
  */
-export const deleteArticle = (id: number) => {
+export const deleteArticle = (id: number | string) => {
   return http.delete<{code: number, message: string}>(`/wx/articles/${id}`)
+}
+
+/**
+ * 刷新单篇文章内容
+ * @param id 文章ID
+ * @returns 任务信息
+ */
+export const refreshArticle = (id: number | string) => {
+  return http.post<{code: number, message: string}>(`/wx/articles/${id}/refresh`)
+}
+
+/**
+ * 查询单篇文章刷新任务状态
+ * @param taskId 任务ID
+ * @returns 任务状态
+ */
+export const getRefreshArticleTaskStatus = (taskId: string) => {
+  return http.get<{code: number, data: any}>(`/wx/articles/refresh/tasks/${taskId}`)
 }
 
 /**
@@ -128,7 +149,7 @@ export const deleteArticle = (id: number) => {
  * @param id 无实际作用（保留参数）
  * @returns 清空结果
  */
-export const ClearArticle = (id: number) => {
+export const ClearArticle = (id?: number | string) => {
   return http.delete<{code: number, message: string}>(`/wx/articles/clean`)
 }
 
@@ -137,7 +158,7 @@ export const ClearArticle = (id: number) => {
  * @param id 无实际作用（保留参数）
  * @returns 清空结果
  */
-export const ClearDuplicateArticle = (id: number) => {
+export const ClearDuplicateArticle = (id?: number | string) => {
   return http.delete<{code: number, message: string}>(`/wx/articles/clean_duplicate_articles`)
 }
 
@@ -147,9 +168,21 @@ export const ClearDuplicateArticle = (id: number) => {
  * @param is_read 阅读状态
  * @returns 操作结果
  */
-export const toggleArticleReadStatus = (id: number, is_read: boolean) => {
+export const toggleArticleReadStatus = (id: number | string, is_read: boolean) => {
   return http.put<{code: number, message: string, is_read: boolean}>(`/wx/articles/${id}/read`, null, {
     params: { is_read }
+  })
+}
+
+/**
+ * 切换文章收藏状态
+ * @param id 文章ID
+ * @param is_favorite 收藏状态
+ * @returns 操作结果
+ */
+export const toggleArticleFavoriteStatus = (id: number | string, is_favorite: boolean) => {
+  return http.put<{code: number, message: string, is_favorite: boolean}>(`/wx/articles/${id}/favorite`, null, {
+    params: { is_favorite }
   })
 }
 
