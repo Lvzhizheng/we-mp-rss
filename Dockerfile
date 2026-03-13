@@ -16,7 +16,8 @@ ENV PLANT_PATH=/app/env
 
 WORKDIR /app
 COPY requirements.txt install.sh ./
-RUN chmod +x /app/install.sh && /app/install.sh
+RUN apt-get update && apt-get install -y --no-install-recommends bash && rm -rf /var/lib/apt/lists/* \
+    && chmod +x /app/install.sh && /app/install.sh
 
 COPY . .
 COPY config.example.yaml /app/config.yaml
