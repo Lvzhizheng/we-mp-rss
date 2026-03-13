@@ -13,9 +13,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends bash && rm -rf 
 
 COPY . .
 COPY config.example.yaml /app/config.yaml
-RUN rm -rf /app/static/* \
-    && cp -r /tmp/web_ui_dist/* /app/static/ \
-    && chmod +x /app/start.sh
+RUN chmod +x /app/start.sh
 
 EXPOSE 8001
 CMD ["/app/start.sh"]
