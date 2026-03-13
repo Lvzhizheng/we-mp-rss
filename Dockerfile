@@ -15,6 +15,7 @@ ENV BROWSER_TYPE=webkit
 ENV PLANT_PATH=/app/env
 
 WORKDIR /app
+RUN echo "1.0.$(date +%Y%m%d.%H%M)">>docker_version.txt
 COPY requirements.txt install.sh ./
 RUN apt-get update && apt-get install -y --no-install-recommends bash && rm -rf /var/lib/apt/lists/* \
     && chmod +x /app/install.sh && /app/install.sh
