@@ -23,14 +23,17 @@ from playwright.sync_api import sync_playwright
 from playwright.async_api import async_playwright
 
 class PlaywrightController:
-    # 类级别的锁和共享资源，确保多线程环境下只有一个playwright实例
+    # 使用线程本地存储，每个线程拥有独立的 playwright 实例
+    # 解决 greenlet "Cannot switch to a different thread" 错误
+    _thread_local = threading.local()
     _global_lock = threading.Lock()
-    _shared_driver = None
-    _driver_ref_count = 0
+    
+    # 每个线程的引用计数，用于正确清理资源
+    _thread_ref_counts = {}
 
     def __init__(self):
         self.system = platform.system().lower()
-        self.driver = None  # 指向全局共享的 playwright driver
+        self.driver = None  # 指向线程本地的 playwright driver
         self.browser = None
         self.context = None
         self.page = None
@@ -107,18 +110,23 @@ class PlaywrightController:
             if self.system != "windows":
                 headless = True
             
-            # 使用全局锁确保线程安全地初始化共享的 playwright driver
-            with PlaywrightController._global_lock:
-                if PlaywrightController._shared_driver is None:
-                    if sys.platform == "win32" :
-                        asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
-                    PlaywrightController._shared_driver = sync_playwright().start()
-                    PlaywrightController._driver_ref_count = 0
-                    print("Playwright driver 已全局初始化")
-                
-                PlaywrightController._driver_ref_count += 1
+            # 使用线程本地存储，确保每个线程有独立的 playwright driver
+            thread_id = threading.current_thread().ident
             
-            self.driver = PlaywrightController._shared_driver
+            with PlaywrightController._global_lock:
+                # 检查当前线程是否已有 driver
+                if not hasattr(PlaywrightController._thread_local, 'driver') or \
+                   PlaywrightController._thread_local.driver is None:
+                    if sys.platform == "win32":
+                        asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+                    PlaywrightController._thread_local.driver = sync_playwright().start()
+                    PlaywrightController._thread_ref_counts[thread_id] = 0
+                    print(f"Playwright driver 已为线程 {thread_id} 初始化")
+                
+                PlaywrightController._thread_ref_counts[thread_id] = \
+                    PlaywrightController._thread_ref_counts.get(thread_id, 0) + 1
+            
+            self.driver = PlaywrightController._thread_local.driver
         
             # 根据浏览器名称选择浏览器类型
             if browser_name.lower() == "firefox":
@@ -383,20 +391,25 @@ class PlaywrightController:
         self.browser = None
         self.isClose = True
         
-        # 使用全局锁管理共享 driver 的生命周期
+        # 使用全局锁管理线程本地 driver 的生命周期
+        thread_id = threading.current_thread().ident
+        
         with PlaywrightController._global_lock:
-            if PlaywrightController._driver_ref_count > 0:
-                PlaywrightController._driver_ref_count -= 1
-            
-            # 只有当引用计数归零时才真正停止 driver
-            if PlaywrightController._driver_ref_count == 0 and PlaywrightController._shared_driver is not None:
-                try:
-                    PlaywrightController._shared_driver.stop()
-                    print("Playwright driver 已全局停止")
-                except Exception as e:
-                    errors.append(f"driver: {e}")
-                finally:
-                    PlaywrightController._shared_driver = None
+            if thread_id in PlaywrightController._thread_ref_counts:
+                PlaywrightController._thread_ref_counts[thread_id] -= 1
+                
+                # 只有当该线程的引用计数归零时才真正停止 driver
+                if PlaywrightController._thread_ref_counts[thread_id] == 0:
+                    if hasattr(PlaywrightController._thread_local, 'driver') and \
+                       PlaywrightController._thread_local.driver is not None:
+                        try:
+                            PlaywrightController._thread_local.driver.stop()
+                            print(f"Playwright driver 已为线程 {thread_id} 停止")
+                        except Exception as e:
+                            errors.append(f"driver: {e}")
+                        finally:
+                            PlaywrightController._thread_local.driver = None
+                    del PlaywrightController._thread_ref_counts[thread_id]
         
         self.driver = None
         if errors:
