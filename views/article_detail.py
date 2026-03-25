@@ -42,9 +42,9 @@ async def article_detail_view(
         article, feed = article_query
         
         # 标记为已读（可选）
-        if not article.is_read:
-            article.is_read = 1
-            session.commit()
+        # if not article.is_read:
+        #     article.is_read = 1
+        #     session.commit()
         
         # 获取相关文章（同公众号的其他文章，排除大字段）
         related_articles = session.query(Article).options(
@@ -89,7 +89,7 @@ async def article_detail_view(
             "url": article.url,
             "publish_time": datetime.fromtimestamp(article.publish_time).strftime('%Y-%m-%d %H:%M') if article.publish_time else "",
             "created_at": article.created_at.strftime('%Y-%m-%d %H:%M') if article.created_at else "",
-            "content": process_content_images(article.content or ""),
+            "content": process_content_images(article.content_html or article.content or ""),
             "mp_name": feed.mp_name if feed else "未知公众号",
             "mp_id": article.mp_id,
             "mp_cover": Web.get_image_url(feed.mp_cover) if feed else "",

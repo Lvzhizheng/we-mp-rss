@@ -469,6 +469,9 @@ class WXArticleFetcher:
         return content[:length]+"..." if len(content)>length else content
 
     def proxy_images(self,content:str)->str:
+        # 防御性检查：确保 content 不是 None
+        if not content:
+            return ""
         try:
             soup = BeautifulSoup(content, 'html.parser')
             # 找到内容
@@ -499,6 +502,15 @@ class WXArticleFetcher:
         if not cfg.get("gather.clean_html",False):
             return html_content
         return htmltools.clean_html(str(html_content).strip(),
+                                remove_ids=
+                                ['content_bottom_interaction',
+                                 'activity-name',
+                                 'meta_content',
+                                 "js_article_bottom_bar",
+                                 "js_pc_weapp_code",
+                                 "js_novel_card",
+                                 "js_pc_qr_code"
+                                 ],
                                  remove_selectors=[
                                      "link",
                                      "head",
