@@ -10,6 +10,15 @@ from core.auth import get_current_user
 from core.config import cfg
 from apis.base import format_search_kw
 from core.print import print_error,print_success
+
+
+def clamp_rss_limit(limit: int) -> int:
+    """Clamp RSS item count to configured bounds to avoid oversized feeds."""
+    default_page_size = int(cfg.get("rss.page_size", 30) or 30)
+    max_items = int(cfg.get("rss.max_items", default_page_size) or default_page_size)
+    if max_items < 1:
+        max_items = default_page_size if default_page_size > 0 else 30
+    return min(limit, max_items)
 def verify_rss_access(current_user: dict = Depends(get_current_user)):
     """
     RSS访问认证方法
@@ -60,6 +69,7 @@ async def get_rss_feeds(
     is_update:bool=False,
     # current_user: dict = Depends(get_current_user)
 ):
+    limit = clamp_rss_limit(limit)
     rss=RSS(name=f'all_{limit}_{offset}')
     rss_xml=rss.get_cache()
     if rss_xml is not None  and is_update==False:
@@ -185,6 +195,7 @@ async def get_mp_articles_source(
     template:str=None
     # current_user: dict = Depends(get_current_user)
 ):
+    limit = clamp_rss_limit(limit)
     rss=RSS(name=f'{tag_id}_{feed_id}_{limit}_{offset}',ext=ext)
     rss.set_content_type(content_type)
     rss_xml = rss.get_cache()
