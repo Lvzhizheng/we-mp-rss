@@ -78,7 +78,6 @@ class WxGather:
         self.get_token()
     def get_token(self):
         cfg.reload()
-        wx_cfg.reload()
         from driver.token import get as get_token_val
         self.Gather_Content=cfg.get('gather.content',False)
         self.cookies = get_token_val('cookie', '')
