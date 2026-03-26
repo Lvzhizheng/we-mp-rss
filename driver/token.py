@@ -37,13 +37,11 @@ def set_token(data:any,ext_data:any=None):
     # 优先存储到Redis，整体存储
     if redis_client.is_connected:
         try:
+            _save_to_local(token_data)
             redis_client._client.set(REDIS_TOKEN_PREFIX + "data", json.dumps(token_data))
             print_success("Token已存储到Redis")
-            _save_to_local(token_data)
         except Exception as e:
             print_warning(f"Redis存储失败，回退到本地文件: {e}")
-            # 回退到本地文件存储
-            _save_to_local(token_data)
     else:
         _save_to_local(token_data)
 

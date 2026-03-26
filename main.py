@@ -2,7 +2,7 @@ import uvicorn
 from core.config import cfg
 from core.print import print_warning, print_info, print_success
 import threading
-from driver.auth import *
+from driver.auth import start_auth_service   
 import os
 if __name__ == '__main__':
     print("环境变量:")
@@ -11,7 +11,7 @@ if __name__ == '__main__':
     if cfg.args.init=="True":
         import init_sys as init
         init.init()
-    
+    start_auth_service()
     # 启动级联同步服务（如果配置为子节点）
     cascade_service_started = False
     if cfg.get("cascade.enabled", False) and cfg.get("cascade.node_type") == "child":
