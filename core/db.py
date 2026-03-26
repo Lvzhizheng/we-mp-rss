@@ -144,16 +144,15 @@ class Db:
                     except ValueError:
                         return now_ts
                 return now_ts
-
             def _to_unix_millis(value, fallback_seconds) -> int:
-                now_ts = int(datetime.now().timestamp())
+                now_ts = datetime.now().timestamp()  # 保留小数精度
                 # 确保 fallback_seconds 是有效的秒级时间戳
                 if fallback_seconds is None:
                     fallback_seconds = now_ts
                 if isinstance(fallback_seconds, (int, float)):
-                    fallback_seconds = int(fallback_seconds)
                     if fallback_seconds > 1_000_000_000_000:
-                        fallback_seconds = int(fallback_seconds / 1000)
+                        fallback_seconds = fallback_seconds / 1000
+                    # 不转换为int，保留小数部分
                 else:
                     fallback_seconds = now_ts
 
@@ -205,6 +204,15 @@ class Db:
             if art.content_html is None:
                 from tools.fix import fix_html
                 art.content_html = fix_html(art.content)
+            
+            # 应用过滤规则
+            try:
+                from apis.filter_rule import apply_filter_rules
+                if art.mp_id and art.content_html:
+                    art.content_html = apply_filter_rules(art.content_html, art.mp_id)
+            except Exception as e:
+                print_warning(f"应用过滤规则失败: {e}")
+            
             from core.models.base import DATA_STATUS
             art.status=DATA_STATUS.ACTIVE
             session.add(art)

@@ -11,11 +11,13 @@ server:
    #启动JOB定时任务，默认为True
    enable_job: ${ENABLE_JOB:-True}
    #代码修改自动重启服务，默认为False
-   auto_reload: ${AUTO_RELOAD:-True}
+   auto_reload: ${AUTO_RELOAD:-False}
    #最大线程数 默认2个线程，不建议超过4个线程
    threads: ${THREADS:-1}
    #通过web方式授权二维码 默认False 
    auth_web: ${WERSS_AUTH_WEB:-True}
+   #是否发送授权二维通知 默认True
+   send_code: ${WERSS_SEND_CODE:-True}
 
 
 #数据库连接 例如db:  mysql+pymysql://<username>:<password>@<host>/we-rss?charset=utf8mb4

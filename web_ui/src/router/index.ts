@@ -12,6 +12,8 @@ import ConfigDetail from '../views/ConfigDetail.vue'
 import MessageTaskList from '../views/MessageTaskList.vue'
 import MessageTaskForm from '../views/MessageTaskForm.vue'
 import NovelReader from '../views/NovelReader.vue'
+import FilterRuleList from '../views/FilterRuleList.vue'
+import FilterRuleForm from '../views/FilterRuleForm.vue'
 
 const routes = [
   {
@@ -170,6 +172,34 @@ const routes = [
         meta: { 
           requiresAuth: true,
           permissions: ['admin'] 
+        }
+      },
+      {
+        path: 'filter-rules',
+        name: 'FilterRuleList',
+        component: FilterRuleList,
+        meta: { 
+          requiresAuth: true,
+          permissions: ['wechat:manage'] 
+        }
+      },
+      {
+        path: 'filter-rules/add',
+        name: 'FilterRuleAdd',
+        component: FilterRuleForm,
+        meta: { 
+          requiresAuth: true,
+          permissions: ['wechat:manage'] 
+        }
+      },
+      {
+        path: 'filter-rules/edit/:id',
+        name: 'FilterRuleEdit',
+        component: FilterRuleForm,
+        props: true,
+        meta: { 
+          requiresAuth: true,
+          permissions: ['wechat:manage'] 
         }
       },
     ]
