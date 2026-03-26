@@ -145,11 +145,7 @@ class Wx:
                                 time.sleep(2)
                                 session_data = self.Call_Success(has_extdata=False)
 
-                                # 保存新的 token 和 cookie
-                                if session_data and session_data.get("token"):
-                                    from driver.token import set_token
-                                    set_token(session_data, self.ext_data)
-                                    print_success(f"已更新Token: {session_data.get('token')}")
+                               
 
                                 self.Token(isClose=False)
                                 print_success("账号切换成功")
@@ -440,6 +436,11 @@ class Wx:
                 print_error(f"获取公众号信息失败: {str(e)}")
                 self.ext_data = None
             Store.save(cookies)
+             # 保存新的 token 和 cookie
+            if self.SESSION and self.SESSION.get("token"):
+                from driver.token import set_token
+                set_token(self.SESSION, self.ext_data)
+                print_success(f"已更新Token: {self.SESSION.get('token')}")
             print_success("登录成功！")
         else:
             print_warning("未登录！")
