@@ -211,7 +211,15 @@ async def get_mp_articles_source(
         # 查询公众号信息
         feed = session.query(Feed)
         query=session.query(Feed, Article).join(Article, Feed.id == Article.mp_id)
-        rss_domain=cfg.get("rss.base_url",str(request.base_url))
+        rss_domain = str(cfg.get("rss.base_url", str(request.base_url))).rstrip("/") + "/"
+        if tag_id is not None:
+            feed_link = f"{rss_domain}feed/tag/{tag_id}.{ext}"
+        elif kw != "":
+            target_feed_id = feed_id or "all"
+            feed_link = f"{rss_domain}feed/search/{kw}/{target_feed_id}.{ext}"
+        else:
+            target_feed_id = feed_id or "all"
+            feed_link = f"{rss_domain}feed/{target_feed_id}.{ext}"
         if feed_id not in ["all",None]:
             feed=feed.filter(Feed.id == feed_id).first()
             query=query.filter(Article.mp_id==feed_id)
@@ -280,7 +288,7 @@ async def get_mp_articles_source(
             }
             rss.cache_content(article.id, content_data)
         # 生成RSS XML
-        rss_xml = rss.generate(rss_list,ext=ext, title=f"{feed.mp_name}",link=rss_domain,description=feed.mp_intro,image_url=feed.mp_cover,template=template)
+        rss_xml = rss.generate(rss_list,ext=ext, title=f"{feed.mp_name}",link=feed_link,description=feed.mp_intro,image_url=feed.mp_cover,template=template)
         
         return Response(
             content=rss_xml,
