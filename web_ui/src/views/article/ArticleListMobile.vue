@@ -29,16 +29,24 @@
                 <a-list-item-meta>
                   <template #title>
                     <div class="article-title-container">
-                      <div 
-                        @click="toggleReadStatus(item)" 
+                      <div
+                        @click="toggleReadStatus(item)"
                         class="read-status-icon"
                         :class="{ 'read': item.is_read === 1 }"
                       >
                         <icon-check v-if="item.is_read === 1" />
                         <icon-close v-else />
                       </div>
-                      <a-typography-text 
-                        strong 
+                      <div
+                        @click="toggleFavoriteStatus(item)"
+                        class="favorite-icon"
+                        :class="{ 'favorited': item.is_favorite === 1 }"
+                      >
+                        <icon-star-fill v-if="item.is_favorite === 1" />
+                        <icon-star v-else />
+                      </div>
+                      <a-typography-text
+                        strong
                         :heading="1"
                         :class="{ 'article-title-read': item.is_read === 1 }"
                       >
@@ -163,8 +171,8 @@
 import { formatDateTime,formatTimestamp } from '@/utils/date'
 import { Avatar } from '@/utils/constants'
 import { ref, onMounted, computed, watch } from 'vue'
-import { IconCheck, IconClose, IconStop, IconPlayArrow, IconCopy } from '@arco-design/web-vue/es/icon'
-import { getArticles, getArticleDetail,getPrevArticle,getNextArticle,toggleArticleReadStatus } from '@/api/article'
+import { IconCheck, IconClose, IconStop, IconPlayArrow, IconCopy, IconStar, IconStarFill } from '@arco-design/web-vue/es/icon'
+import { getArticles, getArticleDetail,getPrevArticle,getNextArticle,toggleArticleReadStatus,toggleArticleFavoriteStatus } from '@/api/article'
 import { getSubscriptions, toggleMpStatus as toggleMpStatusApi } from '@/api/subscription'
 import { Message } from '@arco-design/web-vue'
 import { ProxyImage } from '@/utils/constants'
@@ -431,17 +439,36 @@ const toggleReadStatus = async (record: any) => {
   try {
     const newReadStatus = record.is_read === 1 ? false : true;
     await toggleArticleReadStatus(record.id, newReadStatus);
-    
+
     // 更新本地数据
     const index = articles.value.findIndex(item => item.id === record.id);
     if (index !== -1) {
       articles.value[index].is_read = newReadStatus ? 1 : 0;
     }
-    
+
     Message.success(`文章已标记为${newReadStatus ? '已读' : '未读'}`);
   } catch (error) {
     console.error('更新阅读状态失败:', error);
     Message.error('更新阅读状态失败');
+  }
+};
+
+// 切换文章收藏状态
+const toggleFavoriteStatus = async (record: any) => {
+  try {
+    const newFavoriteStatus = record.is_favorite === 1 ? false : true;
+    await toggleArticleFavoriteStatus(record.id, newFavoriteStatus);
+
+    // 更新本地数据
+    const index = articles.value.findIndex(item => item.id === record.id);
+    if (index !== -1) {
+      articles.value[index].is_favorite = newFavoriteStatus ? 1 : 0;
+    }
+
+    Message.success(`文章已${newFavoriteStatus ? '收藏' : '取消收藏'}`);
+  } catch (error) {
+    console.error('更新收藏状态失败:', error);
+    Message.error('更新收藏状态失败');
   }
 };
 
@@ -638,6 +665,22 @@ a-button {
 
 .read-status-icon.read {
   color: var(--color-success);
+}
+
+.favorite-icon {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  color: var(--color-text-3);
+  transition: all 0.2s ease;
+}
+
+.favorite-icon:hover {
+  transform: scale(1.1);
+}
+
+.favorite-icon.favorited {
+  color: rgb(var(--warning-6));
 }
 
 .article-title-read {
