@@ -95,8 +95,8 @@
       <a-list :data="mpList" :loading="mpLoading && !mpLoadingMore" bordered>
         <template #item="{ item }">
           <a-list-item @click="handleMpClick(item.id)" :class="{ 'active-mp': activeMpId === item.id }"
-            style="display: flex; align-items: center; justify-content: space-between;">
-            <div style="display: flex; align-items: center;">
+            style="display: flex; align-items: center; justify-content: flex-start; text-align: left;">
+            <div style="display: flex; align-items: center; flex: 1;">
               <img :src="Avatar(item.avatar)" width="40" style="float:left;margin-right:1rem;"/>
               <a-typography-text style="line-height:40px;margin-left:1rem;" strong :style="{ opacity: item.status === 0 ? 0.5 : 1 }">
                 {{ item.name || item.mp_name }}
@@ -494,7 +494,6 @@ onMounted(() => {
 
 .arco-drawer-body img {
   max-width: 100vw !important;
-  margin: 0 auto !important;
   padding: 0 !important;
 }
 
@@ -556,7 +555,11 @@ a-button {
   margin-bottom: 16px;
 }
 .arco-list-wrapper{
-  width:80vw;
+  width: 100%;
+}
+
+.mp-list-container .arco-list-wrapper {
+  width: 100%;
 }
 
 .article-title-container {
@@ -589,6 +592,24 @@ a-button {
 .mp-list-container {
   height: calc(100vh - 200px);
   overflow-y: auto;
+  width: 100%;
+}
+
+.mp-list-container :deep(.arco-list-item) {
+  justify-content: flex-start !important;
+}
+
+.mp-list-container :deep(.arco-list-item-content) {
+  justify-content: flex-start !important;
+  width: 100%;
+}
+
+.mp-list-container :deep(.arco-list-wrapper) {
+  width: 100% !important;
+}
+
+.mp-list-container :deep(.arco-list) {
+  width: 100% !important;
 }
 
 .mp-loading-more,
