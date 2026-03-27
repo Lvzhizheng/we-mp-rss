@@ -86,35 +86,39 @@
   <a-drawer v-model:visible="mpListVisible" title="选择公众号" @ok="handleMpSelect" @cancel="mpListVisible = false" placement="left" width="99%">
     <div style="margin-bottom: 12px; padding: 0 8px;">
       <a-radio-group v-model="mpFilterType" type="button" size="small" style="width: 100%;">
+        <a-radio value="all" style="flex: 1; text-align: center;">全部</a-radio>
         <a-radio value="active" style="flex: 1; text-align: center;">启用</a-radio>
         <a-radio value="disabled" style="flex: 1; text-align: center;">停用</a-radio>
-        <a-radio value="all" style="flex: 1; text-align: center;">全部</a-radio>
       </a-radio-group>
     </div>
-    <a-list :data="filteredMpList" :loading="mpLoading" bordered>
-      <template #item="{ item }">
-        <a-list-item @click="handleMpClick(item.id)" :class="{ 'active-mp': activeMpId === item.id }"
-          style="display: flex; align-items: center; justify-content: space-between;">
-          <div style="display: flex; align-items: center;">
-            <img :src="Avatar(item.avatar)" width="40" style="float:left;margin-right:1rem;"/>
-            <a-typography-text style="line-height:40px;margin-left:1rem;" strong :style="{ opacity: item.status === 0 ? 0.5 : 1 }">
-              {{ item.name || item.mp_name }}
-            </a-typography-text>
-          </div>
-          <a-space v-if="activeMpId === item.id && item.id != ''">
-            <a-button size="mini" type="text" @click="$event.stopPropagation(); copyMpId(item.id)">
-              <template #icon><icon-copy /></template>
-            </a-button>
-            <a-button size="mini" type="text" @click="$event.stopPropagation(); toggleMpStatus(item.id, item.status === 1 ? 0 : 1)">
-              <template #icon>
-                <icon-stop v-if="item.status === 1" />
-                <icon-play-arrow v-else />
-              </template>
-            </a-button>
-          </a-space>
-        </a-list-item>
-      </template>
-    </a-list>
+    <div class="mp-list-container" @scroll="handleMpScroll">
+      <a-list :data="mpList" :loading="mpLoading && !mpLoadingMore" bordered>
+        <template #item="{ item }">
+          <a-list-item @click="handleMpClick(item.id)" :class="{ 'active-mp': activeMpId === item.id }"
+            style="display: flex; align-items: center; justify-content: space-between;">
+            <div style="display: flex; align-items: center;">
+              <img :src="Avatar(item.avatar)" width="40" style="float:left;margin-right:1rem;"/>
+              <a-typography-text style="line-height:40px;margin-left:1rem;" strong :style="{ opacity: item.status === 0 ? 0.5 : 1 }">
+                {{ item.name || item.mp_name }}
+              </a-typography-text>
+            </div>
+            <a-space v-if="activeMpId === item.id && item.id != ''">
+              <a-button size="mini" type="text" @click="$event.stopPropagation(); copyMpId(item.id)">
+                <template #icon><icon-copy /></template>
+              </a-button>
+              <a-button size="mini" type="text" @click="$event.stopPropagation(); toggleMpStatus(item.id, item.status === 1 ? 0 : 1)">
+                <template #icon>
+                  <icon-stop v-if="item.status === 1" />
+                  <icon-play-arrow v-else />
+                </template>
+              </a-button>
+            </a-space>
+          </a-list-item>
+        </template>
+      </a-list>
+      <div v-if="mpLoadingMore" class="mp-loading-more">加载中...</div>
+      <div v-else-if="!mpHasMore && mpList.length > 0" class="mp-no-more">没有更多了</div>
+    </div>
       <template #footer>
         <a-link href="/add-subscription"  style="float:left;">
           <a-icon type="plus" />
@@ -154,7 +158,7 @@
 <script setup lang="ts">
 import { formatDateTime,formatTimestamp } from '@/utils/date'
 import { Avatar } from '@/utils/constants'
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import { IconCheck, IconClose, IconStop, IconPlayArrow, IconCopy } from '@arco-design/web-vue/es/icon'
 import { getArticles, getArticleDetail,getPrevArticle,getNextArticle,toggleArticleReadStatus } from '@/api/article'
 import { getSubscriptions, toggleMpStatus as toggleMpStatusApi } from '@/api/subscription'
@@ -167,7 +171,16 @@ const mpLoading = ref(false)
 const activeMpId = ref('')
 const searchText = ref('')
 const mpListVisible = ref(false)
-const mpFilterType = ref('active') // 'active' | 'disabled' | 'all'
+const mpFilterType = ref('all') // 'active' | 'disabled' | 'all'
+
+// 公众号列表分页状态
+const mpPagination = ref({
+  current: 1,
+  pageSize: 20,
+  total: 0
+})
+const mpHasMore = ref(true)
+const mpLoadingMore = ref(false)
 
 const pagination = ref({
   current: 1,
@@ -293,17 +306,25 @@ const fullLoading = ref(false)
 const loadingMore = ref(false)
 const hasMore = ref(true)
 
-// 过滤后的公众号列表
-const filteredMpList = computed(() => {
-  if (mpFilterType.value === 'all') {
-    return mpList.value
-  }
-  if (mpFilterType.value === 'disabled') {
-    return mpList.value.filter(item => item.status === 0)
-  }
-  // 'active' - 默认只显示启用的和"全部"选项
-  return mpList.value.filter(item => item.status !== 0 || item.id === '')
+// 监听筛选类型变化，重新请求公众号列表
+watch(mpFilterType, () => {
+  mpPagination.value.current = 1
+  mpList.value = []
+  mpHasMore.value = true
+  fetchMpList()
 })
+
+// 公众号列表滚动加载更多
+const handleMpScroll = (event: Event) => {
+  const target = event.target as HTMLElement
+  const { scrollTop, scrollHeight, clientHeight } = target
+  if (scrollHeight - (scrollTop + clientHeight) < 100 && !mpLoadingMore.value && mpHasMore.value) {
+    mpLoadingMore.value = true
+    fetchMpList(true).finally(() => {
+      mpLoadingMore.value = false
+    })
+  }
+}
 
 const handleScroll = (event: Event) => {
   const target = event.target as HTMLElement
@@ -330,21 +351,60 @@ const clear_articles = () => {
   })
 }
 
-const fetchMpList = async () => {
+const fetchMpList = async (isLoadMore = false) => {
+  if (mpLoading.value || (isLoadMore && !mpHasMore.value)) return
   mpLoading.value = true
   try {
+    // 根据筛选类型确定 status 参数
+    let statusParam: number | undefined = undefined
+    if (mpFilterType.value === 'active') {
+      statusParam = 1
+    } else if (mpFilterType.value === 'disabled') {
+      statusParam = 0
+    }
+    // 'all' 时不传 status 参数
+
+    // 选择"全部"时，第一页请求少2条（因为会添加"全部"选项，后端也会添加"精选文章"）
+    const isFirstPage = mpPagination.value.current === 1
+    const adjustedPageSize = mpFilterType.value === 'all' && isFirstPage
+      ? mpPagination.value.pageSize - 2
+      : mpPagination.value.pageSize
+
     const res = await getSubscriptions({
-      page: 0,
-      pageSize: 100
+      page: mpPagination.value.current - 1,
+      pageSize: adjustedPageSize,
+      status: statusParam
     })
-    
-    mpList.value = res.list.map(item => ({
+
+    const newItems = res.list.map(item => ({
       id: item.id || item.mp_id,
       name: item.name || item.mp_name,
       avatar: item.avatar || item.mp_cover || '',
       mp_intro: item.mp_intro || item.mp_intro || '',
       status: item.status ?? 1
     }))
+
+    if (isLoadMore) {
+      mpList.value = [...mpList.value, ...newItems]
+    } else {
+      mpList.value = newItems
+      // 只在筛选全部时添加'全部'选项
+      if (mpFilterType.value === 'all') {
+        mpList.value.unshift({
+          id: '',
+          name: '全部',
+          avatar: '/static/logo.svg',
+          mp_intro: '显示所有公众号文章',
+          status: 1
+        })
+      }
+    }
+
+    mpPagination.value.total = res.total || 0
+    mpHasMore.value = newItems.length >= adjustedPageSize
+    if (mpHasMore.value) {
+      mpPagination.value.current++
+    }
   } catch (error) {
     console.error('获取公众号列表错误:', error)
   } finally {
@@ -524,6 +584,19 @@ a-button {
 .article-title-read {
   text-decoration: line-through;
   opacity: 0.7;
+}
+
+.mp-list-container {
+  height: calc(100vh - 200px);
+  overflow-y: auto;
+}
+
+.mp-loading-more,
+.mp-no-more {
+  text-align: center;
+  padding: 16px;
+  color: var(--color-text-3);
+  font-size: 14px;
 }
 </style>
 <style>

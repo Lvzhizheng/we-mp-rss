@@ -34,9 +34,9 @@
             </div>
             <div style="margin-bottom: 8px; padding: 0 8px;">
               <a-radio-group v-model="mpFilterType" type="button" size="small" style="width: 100%;">
+                <a-radio value="all" style="flex: 1; text-align: center;">全部</a-radio>
                 <a-radio value="active" style="flex: 1; text-align: center;">启用</a-radio>
                 <a-radio value="disabled" style="flex: 1; text-align: center;">停用</a-radio>
-                <a-radio value="all" style="flex: 1; text-align: center;">全部</a-radio>
               </a-radio-group>
             </div>
             <a-list :data="mpList" :loading="mpLoading" bordered>
@@ -864,9 +864,14 @@ const fetchMpList = async () => {
     }
     // 'all' 时不传 status 参数
 
+    // 选择"全部"时，请求少2条（因为会添加"全部"选项，后端也会添加"精选文章"）
+    const adjustedPageSize = mpFilterType.value === 'all' && !mpSearchText.value
+      ? mpPagination.value.pageSize - 2
+      : mpPagination.value.pageSize
+
     const res = await getSubscriptions({
       page: mpPagination.value.current - 1,
-      pageSize: mpPagination.value.pageSize,
+      pageSize: adjustedPageSize,
       kw: mpSearchText.value,
       status: statusParam
     })
