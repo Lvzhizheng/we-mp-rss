@@ -247,8 +247,8 @@ class Wx:
 
             setLockStatus(True)    
                 
-            from driver.token import wx_cfg
-            token = str(wx_cfg.get("token", ""))
+            from driver.token import get as get_val
+            token = str(get_val("token", ""))
             if not token:
                 print_warning("未找到有效的token")
                 return None

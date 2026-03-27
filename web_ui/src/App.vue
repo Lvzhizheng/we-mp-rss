@@ -189,9 +189,9 @@
         <a-modal v-model:visible="wxAccountVisible" title="公众号信息" :footer="false" :width="400">
           <div class="wx-account-info" v-if="wxLoginInfo?.ext_data">
             <div class="wx-account-header">
-              <a-avatar :size="64">
+              <a-avatar :size="64" class="wx-account-avatar">
                 <img v-if="wxLoginInfo.ext_data.wx_logo" :src="wxLoginInfo.ext_data.wx_logo" alt="公众号头像">
-                <icon-user v-else />
+                <icon-wechat v-else />
               </a-avatar>
               <div class="wx-account-name">{{ wxLoginInfo.ext_data.wx_app_name || '未知公众号' }}</div>
             </div>

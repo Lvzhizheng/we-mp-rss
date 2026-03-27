@@ -457,8 +457,9 @@ class WXArticleFetcher:
             print_error(f"修复图片失败: {str(e)}")
         return content
     def get_image_url(self,url:str)->str:
-        base_url=cfg.get("server.base_url","")
-        return f"{base_url}/static/res/logo/{url}" 
+        # base_url=cfg.get("server.base_url","")
+        # return f"{base_url}/static/res/logo/{url}" 
+        return f"{url}" 
     def get_description(self,content:str,length:int=200)->str:
         soup = BeautifulSoup(content, 'html.parser')
             # 找到内容

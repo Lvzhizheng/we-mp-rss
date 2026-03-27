@@ -5,9 +5,6 @@ import type { MpItem } from '@/types/subscription'
 
 const formatCoverUrl = (url: string) => {
   if (!url) return ''
-  if (url.startsWith('http://') || url.startsWith('https://')) {
-    return '/static/res/logo/' + url
-  }
   return url
 }
 

@@ -6,7 +6,8 @@ export const Avatar = (url) => {
     return url;
 }
 export const ProxyImage=(content) =>{
-   return content.replace(
-      /(<img[^>]*src=["'])(https?:\/\/[^"']*)/g,
-       '$1/static/res/logo/$2').replace(/<img([^>]*)width=["'][^"']*["']([^>]*)>/g, '<img$1$2>');
+  return content;
+  //  return content.replace(
+  //     /(<img[^>]*src=["'])(https?:\/\/[^"']*)/g,
+  //      '$1/static/res/logo/$2').replace(/<img([^>]*)width=["'][^"']*["']([^>]*)>/g, '<img$1$2>');
 }
