@@ -321,9 +321,6 @@ def get_filter_rules_for_mp(mp_id: str) -> list:
     返回规则列表，用于HTML过滤
     支持多公众号匹配和全局规则（空mp_id数组）
     """
-    if not mp_id:
-        return []
-    
     session = DB.get_session()
     try:
         rules = session.query(FilterRule).filter(
