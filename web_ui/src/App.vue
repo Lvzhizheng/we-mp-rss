@@ -164,7 +164,7 @@
           </div>
           <template #content>
             <a-doption v-if="haswxLogined && wxLoginInfo?.ext_data" @click="showWxAccountInfo">
-              <template #icon><icon-user /></template>
+              <template #icon><icon-wechat /></template>
               公众号信息
             </a-doption>
             <a-doption @click="goToEditUser">
@@ -204,6 +204,14 @@
               </a-descriptions-item>
               <a-descriptions-item label="Token状态">
                 <a-tag :color="haswxLogined ? 'green' : 'red'">{{ haswxLogined ? '已授权' : '未授权' }}</a-tag>
+              </a-descriptions-item>
+              <a-descriptions-item label="Token" v-if="wxLoginInfo?.token">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <span style="font-family: monospace; font-size: 12px; word-break: break-all;">{{ wxLoginInfo.token }}</span>
+                  <a-button size="mini" @click="copyToken">
+                    <template #icon><icon-copy /></template>
+                  </a-button>
+                </div>
               </a-descriptions-item>
               <a-descriptions-item label="到期时间" v-if="wxLoginInfo?.expiry?.expiry_time">
                 {{ wxLoginInfo.expiry.expiry_time }}
@@ -317,6 +325,13 @@ const fetchSysInfo = async () => {
 
 const showWxAccountInfo = () => {
   wxAccountVisible.value = true
+}
+
+const copyToken = () => {
+  if (wxLoginInfo.value?.token) {
+    navigator.clipboard.writeText(wxLoginInfo.value.token)
+    Message.success('Token已复制到剪贴板')
+  }
 }
 
 const handleCollapse = (val: boolean) => {

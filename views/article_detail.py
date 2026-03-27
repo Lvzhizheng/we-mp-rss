@@ -89,7 +89,7 @@ async def article_detail_view(
             "url": article.url,
             "publish_time": datetime.fromtimestamp(article.publish_time).strftime('%Y-%m-%d %H:%M') if article.publish_time else "",
             "created_at": article.created_at.strftime('%Y-%m-%d %H:%M') if article.created_at else "",
-            "content": process_content_images(article.content_html or article.content or ""),
+            "content": (article.content or article.content_html or ""),
             "mp_name": feed.mp_name if feed else "未知公众号",
             "mp_id": article.mp_id,
             "mp_cover": Web.get_image_url(feed.mp_cover) if feed else "",
