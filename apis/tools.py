@@ -636,3 +636,95 @@ async def download_cropped_image(
         raise
     except Exception as e:
         return error_response(500, f"下载失败: {str(e)}")
+
+
+@router.get("/image/proxy", summary="代理下载远程图片")
+async def proxy_remote_image(
+    url: str = Query(..., description="图片URL地址"),
+    aspect_ratio: Optional[str] = Query(None, description="目标比例，如 '16:9', '4:3', '1:1'"),
+    width: Optional[int] = Query(None, description="目标宽度"),
+    height: Optional[int] = Query(None, description="目标高度"),
+    mode: CropMode = Query("center", description="裁剪方式"),
+    output_format: str = Query("png", description="输出格式：png, jpeg, webp")
+):
+    """
+    代理下载远程图片，支持裁剪
+    
+    - url: 图片URL地址（需要URL编码）
+    - aspect_ratio: 目标比例，如 '16:9'
+    - width/height: 目标尺寸
+    - mode: 裁剪方式 (center/top/bottom/left/right/top-left/top-right/bottom-left/bottom-right)
+    - output_format: 输出格式
+    """
+    try:
+        import httpx
+        
+        # 下载图片
+        async with httpx.AsyncClient(timeout=30, follow_redirects=True) as client:
+            response = await client.get(url)
+            if response.status_code != 200:
+                return error_response(400, f"下载图片失败: HTTP {response.status_code}")
+            image_data = response.content
+        
+        # 判断是否需要裁剪
+        if aspect_ratio or (width and height):
+            # 执行裁剪
+            cropped_data, original_size, new_size = process_image_crop(
+                image_data=image_data,
+                aspect_ratio=aspect_ratio,
+                target_width=width,
+                target_height=height,
+                mode=mode,
+                output_format=output_format
+            )
+        else:
+            # 不裁剪，直接返回原图
+            cropped_data = image_data
+            try:
+                img = Image.open(io.BytesIO(image_data))
+                original_size = img.size
+                new_size = img.size
+                # 尝试从图片或URL推断格式
+                img_format = img.format.lower() if img.format else "png"
+                if img_format in ["jpeg", "jpg", "png", "webp"]:
+                    output_format = img_format if img_format != "jpg" else "jpeg"
+            except Exception:
+                original_size = (0, 0)
+                new_size = (0, 0)
+        
+        # 确定MIME类型
+        mime_map = {
+            "png": "image/png",
+            "jpg": "image/jpeg",
+            "jpeg": "image/jpeg",
+            "webp": "image/webp"
+        }
+        media_type = mime_map.get(output_format.lower(), "image/png")
+        
+        # 从URL提取文件名
+        from urllib.parse import urlparse, unquote
+        parsed_url = urlparse(url)
+        path = unquote(parsed_url.path)
+        original_filename = os.path.basename(path) if path else "image"
+        if "." not in original_filename:
+            original_filename = f"{original_filename}.{output_format}"
+        else:
+            # 替换扩展名
+            original_filename = f"{os.path.splitext(original_filename)[0]}.{output_format}"
+        
+        return Response(
+            content=cropped_data,
+            media_type=media_type,
+            headers={
+                "Content-Disposition": f'inline; filename="{original_filename}"',
+                "X-Original-Width": str(original_size[0]),
+                "X-Original-Height": str(original_size[1]),
+                "X-New-Width": str(new_size[0]),
+                "X-New-Height": str(new_size[1])
+            }
+        )
+        
+    except ValueError as e:
+        return error_response(400, str(e))
+    except Exception as e:
+        return error_response(500, f"图片处理失败: {str(e)}")
