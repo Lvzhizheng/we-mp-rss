@@ -2,7 +2,7 @@
 <div class="pagination-container">
     <div class="pagination-wrapper">
         {% if has_prev %}
-        <a href="{{base_url}}?page={{prev_page}}&limit={{limit}}{% if keyword %}&keyword={{keyword}}{% endif %}" class="btn btn-secondary">« 上一页</a>
+        <a href="{{prev_url}}" class="btn btn-secondary">« 上一页</a>
         {% endif %}
 
         <div class="pagination-info">
@@ -12,7 +12,7 @@
         </div>
 
         {% if has_next %}
-        <a href="{{base_url}}?page={{next_page}}&limit={{limit}}{% if keyword %}&keyword={{keyword}}{% endif %}" class="btn btn-secondary">下一页 »</a>
+        <a href="{{next_url}}" class="btn btn-secondary">下一页 »</a>
         {% endif %}
     </div>
 </div>

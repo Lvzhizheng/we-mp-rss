@@ -23,7 +23,6 @@ from sqlalchemy.orm import defer
 router = APIRouter(tags=["文章"])
 
 @router.get("/articles", response_class=HTMLResponse, summary="文章列表页")
-@cache_view("articles_list", ttl=1800)  # 缓存30分钟
 async def articles_view(
     request: Request,
     page: int = Query(1, ge=1, description="页码"),
@@ -185,6 +184,26 @@ async def articles_view(
             "mp_id": mp_id,
         } if feed_info else {}
         
+        # 构建分页URL辅助函数
+        def build_page_url(page_num: int) -> str:
+            params = []
+            if mp_id:
+                params.append(f"mp_id={mp_id}")
+            if tag_id:
+                params.append(f"tag_id={tag_id}")
+            if keyword:
+                params.append(f"keyword={keyword}")
+            if sort != "publish_time":
+                params.append(f"sort={sort}")
+            if order != "desc":
+                params.append(f"order={order}")
+            params.append(f"page={page_num}")
+            params.append(f"limit={limit}")
+            return "/views/articles?" + "&".join(params)
+        
+        prev_url = build_page_url(prev_page) if has_prev else None
+        next_url = build_page_url(next_page) if has_next else None
+        
         parser = TemplateParser(template_content, template_dir=base.public_dir)
         html_content = parser.render({
             "site": base.site,
@@ -197,7 +216,8 @@ async def articles_view(
             "has_next": has_next,
             "prev_page": prev_page,
             "next_page": next_page,
-            "base_url": "/views/articles?mp_id={mp_id}&tag_id={tag_id}",
+            "prev_url": prev_url,
+            "next_url": next_url,
             "filter_info": filter_info,
             "tag_options": tag_options,
             "mp_options": mp_options,
