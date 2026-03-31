@@ -165,8 +165,8 @@ class Db:
            
             from core.models.base import DATA_STATUS
             art.status=DATA_STATUS.ACTIVE # type: ignore
-            existing_ts = existing_article.publish_time
             new_ts = art.publish_time
+            existing_ts = existing_article.publish_time if existing_article else new_ts
             if new_ts and existing_ts and new_ts > existing_ts: # type: ignore
                 session.merge(art)
                 print_info(f"Updated article (UNIQUE): {art.id} (newer publish_time)")
