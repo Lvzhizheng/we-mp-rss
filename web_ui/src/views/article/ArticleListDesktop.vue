@@ -454,7 +454,7 @@ const columns = computed(() => {
           }),
           h('span', {
             style: { fontSize: '12px' }
-          }, isRead ? '已阅' : '未读')
+          }, isRead ? '' : '')
         ]);
       }
     },
