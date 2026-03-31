@@ -154,8 +154,26 @@
             <a-input-search class="search-input" v-model="searchText" placeholder="搜索文章标题" @search="handleSearch" @keyup.enter="handleSearch"
               allow-clear />
             <a-checkbox class="favorite-filter" :model-value="onlyFavorite" @change="handleFavoriteFilterChange">仅显示已收藏</a-checkbox>
+            <a-dropdown trigger="click" position="bl">
+              <a-button size="small">
+                <template #icon><icon-settings /></template>
+                列设置
+              </a-button>
+              <template #content>
+                <a-doption v-for="col in allColumnOptions" :key="col.key" @click.stop>
+                  <a-checkbox 
+                    :model-value="visibleColumns.includes(col.key)" 
+                    @change="(val) => toggleColumn(col.key, val)"
+                    :disabled="col.required"
+                  >
+                    {{ col.label }}
+                  </a-checkbox>
+                </a-doption>
+              </template>
+            </a-dropdown>
           </div>
-          <a-table :columns="columns" :data="articles" :loading="loading" :pagination="pagination" :row-selection="{
+          <a-table :columns="columns" :data="articles" :loading="loading" :pagination="pagination"
+            :row-selection="{
             type: 'checkbox',
             showCheckedAll: true,
             width: 50,
@@ -253,7 +271,7 @@ import { Avatar } from '@/utils/constants'
 import { translatePage, setCurrentLanguage } from '@/utils/translate';
 import { ref, onMounted, h, nextTick, watch, computed } from 'vue'
 import axios from 'axios'
-import { IconApps, IconAtt, IconDelete, IconEdit, IconEye, IconRefresh, IconScan, IconWeiboCircleFill, IconWifi, IconCode, IconCheck, IconClose, IconStop, IconPlayArrow, IconCopy, IconPlus, IconDown, IconExport, IconImport, IconShareExternal, IconStar, IconStarFill, IconLink } from '@arco-design/web-vue/es/icon'
+import { IconApps, IconAtt, IconDelete, IconEdit, IconEye, IconRefresh, IconScan, IconWeiboCircleFill, IconWifi, IconCode, IconCheck, IconClose, IconStop, IconPlayArrow, IconCopy, IconPlus, IconDown, IconExport, IconImport, IconShareExternal, IconStar, IconStarFill, IconLink, IconSettings } from '@arco-design/web-vue/es/icon'
 import { getArticles, deleteArticle as deleteArticleApi, ClearArticle, ClearDuplicateArticle, getArticleDetail, getRefreshArticleTaskStatus, refreshArticle as refreshArticleApi, toggleArticleFavoriteStatus, toggleArticleReadStatus } from '@/api/article'
 import { ExportOPML, ExportMPS, ImportMPS } from '@/api/export'
 import ExportModal from '@/components/ExportModal.vue'
@@ -365,106 +383,183 @@ const publishTypeColorMap: Record<number, string> = {
   3: 'orange'
 }
 
-const columns = [
-  {
-    title: '已阅',
-    dataIndex: 'is_read',
-    width: 70,
-    render: ({ record }) => {
-      const isRead = record.is_read === 1;
-      return h('div', { 
-        style: { 
-          display: 'flex', 
-          alignItems: 'center', 
-          cursor: 'pointer',
-          color: isRead ? 'var(--color-success)' : 'var(--color-text-3)'
-        },
-        onClick: () => toggleReadStatus(record)
-      }, [
-        h(isRead ? IconCheck : IconClose, { 
-          style: { marginRight: '4px' } 
-        }),
-        h('span', { 
-          style: { fontSize: '12px' } 
-        }, isRead ? '已读' : '未读')
-      ]);
-    }
-  },
-  {
-    title: '文章标题',
-    dataIndex: 'title',
-    width: window.innerWidth - 1200,
-    ellipsis: true,
-    render: ({ record }) => h('a', {
-      href: issourceUrl.value ? record.url || '#' : "/views/article/" + record.id,
-      title: record.title,
-      target: '_blank',
-      style: { 
-        color: 'var(--color-text-1)',
-        textDecoration: record.is_read === 1 ? 'line-through' : 'none',
-        opacity: record.is_read === 1 ? 0.7 : 1
-      }
-    }, record.title)
-  },
-  {
-    title: '公众号',
-    dataIndex: 'mp_id',
-    width: 100,
-    ellipsis: true,
-    render: ({ record }) => {
-      const mp = mpList.value.find(item => item.id === record.mp_id);
-      return h('a', {
-        style: {
-          color: 'var(--color-link)',
-          cursor: 'pointer',
-          textDecoration: 'none'
-        },
-        onClick: (e: MouseEvent) => {
-          e.preventDefault()
-          handleMpClick(record.mp_id)
-        }
-      }, record.mp_name || mp?.name || record.mp_id)
-    }
-  },
-  {
-    title: '原创',
-    dataIndex: 'copyright_stat',
-    width: 70,
-    align: 'center',
-    render: ({ record }) => {
-      const stat = record.copyright_stat ?? 0
-      return h('a-tag', {
-        color: copyrightColorMap[stat] || 'gray',
-        size: 'small'
-      }, copyrightTextMap[stat] || '未知')
-    }
-  },
-  {
-    title: '更新时间',
-    dataIndex: 'created_at',
-    width: 130,
-    render: ({ record }) => h('span',
-      { style: { color: 'var(--color-text-3)', fontSize: '12px' } },
-      formatDateTime(record.created_at)
-    )
-  },
-  {
-    title: '发布时间',
-    dataIndex: 'publish_time',
-    width: 130,
-    render: ({ record }) => h('span',
-      { style: { color: 'rgb(var(--color-text-3))', fontSize: '12px' } },
-      formatTimestamp(record.publish_time)
-    )
-  },
-  {
-    title: '操作',
-    dataIndex: 'actions',
-    width: 160,
-    align: 'center',
-    slotName: 'actions'
-  }
+// 列配置选项
+const allColumnOptions = [
+  { key: 'is_read', label: '已阅', required: true },
+  { key: 'title', label: '文章标题', required: true },
+  { key: 'mp_id', label: '公众号', required: false },
+  { key: 'copyright_stat', label: '原创', required: false },
+  { key: 'item_show_types', label: '类型', required: false },
+  { key: 'publish_type', label: '发布', required: false },
+  { key: 'created_at', label: '更新时间', required: false },
+  { key: 'publish_time', label: '发布时间', required: false },
+  { key: 'actions', label: '操作', required: true }
 ]
+
+// 默认显示的列
+const defaultVisibleColumns = ['is_read', 'title', 'mp_id', 'created_at', 'publish_time', 'actions']
+
+// 从 localStorage 读取列配置
+const getStoredColumns = (): string[] => {
+  try {
+    const stored = localStorage.getItem('articleListVisibleColumns')
+    if (stored) {
+      return JSON.parse(stored)
+    }
+  } catch {}
+  return defaultVisibleColumns
+}
+
+const visibleColumns = ref<string[]>(getStoredColumns())
+
+// 切换列显示状态
+const toggleColumn = (key: string, checked: boolean) => {
+  const option = allColumnOptions.find(o => o.key === key)
+  if (option?.required) return
+  
+  if (checked) {
+    if (!visibleColumns.value.includes(key)) {
+      visibleColumns.value = [...visibleColumns.value, key]
+    }
+  } else {
+    visibleColumns.value = visibleColumns.value.filter(k => k !== key)
+  }
+  localStorage.setItem('articleListVisibleColumns', JSON.stringify(visibleColumns.value))
+}
+
+// 计算动态宽度 - 不再需要，标题列自适应
+// const getDynamicTitleWidth = () => { ... }
+
+const columns = computed(() => {
+  const allColumns = [
+    {
+      title: '已阅',
+      dataIndex: 'is_read',
+      width: 70,
+      render: ({ record }) => {
+        const isRead = record.is_read === 1;
+        return h('div', { 
+          style: { 
+            display: 'flex', 
+            alignItems: 'center', 
+            cursor: 'pointer',
+            color: isRead ? 'var(--color-success)' : 'var(--color-text-3)'
+          },
+          onClick: () => toggleReadStatus(record)
+        }, [
+          h(isRead ? IconCheck : IconClose, { 
+            style: { marginRight: '4px' } 
+          }),
+          h('span', { 
+            style: { fontSize: '12px' } 
+          }, isRead ? '已读' : '未读')
+        ]);
+      }
+    },
+    {
+      title: '文章标题',
+      dataIndex: 'title',
+      ellipsis: true,
+      render: ({ record }) => h('a', {
+        href: issourceUrl.value ? record.url || '#' : "/views/article/" + record.id,
+        title: record.title,
+        target: '_blank',
+        style: { 
+          color: 'var(--color-text-1)',
+          textDecoration: record.is_read === 1 ? 'line-through' : 'none',
+          opacity: record.is_read === 1 ? 0.7 : 1
+        }
+      }, record.title)
+    },
+    {
+      title: '公众号',
+      dataIndex: 'mp_id',
+      width: 100,
+      ellipsis: true,
+      render: ({ record }) => {
+        const mp = mpList.value.find(item => item.id === record.mp_id);
+        return h('a', {
+          style: {
+            color: 'var(--color-link)',
+            cursor: 'pointer',
+            textDecoration: 'none'
+          },
+          onClick: (e: MouseEvent) => {
+            e.preventDefault()
+            handleMpClick(record.mp_id)
+          }
+        }, record.mp_name || mp?.name || record.mp_id)
+      }
+    },
+    {
+      title: '原创',
+      dataIndex: 'copyright_stat',
+      width: 60,
+      align: 'center',
+      render: ({ record }) => {
+        const stat = record.copyright_stat ?? 0
+        return h('a-tag', {
+          color: copyrightColorMap[stat] || 'gray',
+          size: 'small'
+        }, copyrightTextMap[stat] || '未知')
+      }
+    },
+    {
+      title: '类型',
+      dataIndex: 'item_show_types',
+      width: 60,
+      align: 'center',
+      render: ({ record }) => {
+        const showType = record.item_show_types ?? 0
+        return h('a-tag', {
+          color: itemShowTypeColorMap[showType] || 'gray',
+          size: 'small'
+        }, itemShowTypeTextMap[showType] || '图文')
+      }
+    },
+    {
+      title: '发布',
+      dataIndex: 'publish_type',
+      width: 60,
+      align: 'center',
+      render: ({ record }) => {
+        const pubType = record.publish_type
+        if (pubType === undefined || pubType === null) return '-'
+        return h('a-tag', {
+          color: publishTypeColorMap[pubType] || 'gray',
+          size: 'small'
+        }, publishTypeTextMap[pubType] || `${pubType}`)
+      }
+    },
+    {
+      title: '更新时间',
+      dataIndex: 'created_at',
+      width: 130,
+      render: ({ record }) => h('span',
+        { style: { color: 'var(--color-text-3)', fontSize: '12px' } },
+        formatDateTime(record.created_at)
+      )
+    },
+    {
+      title: '发布时间',
+      dataIndex: 'publish_time',
+      width: 130,
+      render: ({ record }) => h('span',
+        { style: { color: 'rgb(var(--color-text-3))', fontSize: '12px' } },
+        formatTimestamp(record.publish_time)
+      )
+    },
+    {
+      title: '操作',
+      dataIndex: 'actions',
+      width: 160,
+      align: 'center',
+      slotName: 'actions'
+    }
+  ]
+  
+  return allColumns.filter(col => visibleColumns.value.includes(col.dataIndex as string))
+})
 
 const handleMpPageChange = (page: number, pageSize: number) => {
   mpPagination.value.current = page
@@ -1223,6 +1318,18 @@ const toggleFavoriteStatus = async (record: any) => {
 
 :deep(.arco-table-th-item) {
   justify-content: center;
+}
+
+:deep(.arco-table) {
+  width: 100%;
+}
+
+:deep(.arco-table-container) {
+  overflow-x: hidden;
+}
+
+:deep(.arco-table-content) {
+  overflow-x: hidden;
 }
 
 .arco-drawer-body img {
