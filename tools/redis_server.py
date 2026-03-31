@@ -5,6 +5,7 @@
 
 使用方法:
     python redis_server.py --port 6379 --max-memory 128
+    python redis_server.py --config ../config.yaml
 
 支持命令:
     PING, ECHO, SET, GET, DEL, EXISTS, KEYS, TTL, EXPIRE
@@ -20,6 +21,7 @@ import time
 import argparse
 import json
 import os
+import yaml
 from typing import Dict, Any, Optional, List, Tuple, Union
 from datetime import datetime
 from collections import OrderedDict
@@ -553,7 +555,7 @@ class RedisServer:
         except Exception as e:
             print(f"[ERROR] 保存持久化数据失败: {e}")
     
-    def handle_command(self, command: List[str]) -> Any:
+    def handle_command(self, command: List[str], authenticated: bool = False) -> Any:
         """处理 Redis 命令"""
         if not command:
             return RedisError("empty command")
@@ -562,8 +564,8 @@ class RedisServer:
         args = command[1:]
         self.stats['total_commands'] += 1
         
-        # 认证检查
-        if self.password and cmd != 'AUTH':
+        # 认证检查 - 如果服务端设置了密码且客户端未认证，则拒绝除 AUTH 外的所有命令
+        if self.password and not authenticated and cmd != 'AUTH':
             return RedisError("NOAUTH Authentication required")
         
         # 基础命令
@@ -846,13 +848,19 @@ db0:keys={len(self.store.data)},expires={len(self.store.expires)}
                         
                         # 处理命令
                         if isinstance(command, list):
-                            result = self.handle_command(command)
+                            result = self.handle_command(command, authenticated)
                         elif isinstance(command, str):
                             # 内联命令
                             parts = command.split()
-                            result = self.handle_command(parts)
+                            result = self.handle_command(parts, authenticated)
                         else:
                             result = RedisError("invalid command format")
+                        
+                        # 如果 AUTH 命令成功，更新认证状态
+                        if isinstance(command, list) and command and command[0].upper() == 'AUTH':
+                            if result == 'OK':
+                                authenticated = True
+                                print(f"[INFO] 客户端 {address} 认证成功")
                         
                         # 发送响应
                         response = RESPParser.encode(result)
@@ -936,21 +944,199 @@ db0:keys={len(self.store.data)},expires={len(self.store.expires)}
                 self._save_data()
 
 
-def main():
+def load_config(config_path: str) -> Dict[str, Any]:
+    """从配置文件加载配置"""
+    config = {}
+    
+    if os.path.exists(config_path):
+        try:
+            with open(config_path, 'r', encoding='utf-8') as f:
+                config = yaml.safe_load(f) or {}
+            print(f"[INFO] 加载配置文件: {config_path}")
+        except Exception as e:
+            print(f"[WARN] 加载配置文件失败: {e}")
+    
+    return config
+
+
+def expand_env_vars(value: Any) -> Any:
+    """展开环境变量"""
+    if isinstance(value, str):
+        # 处理 ${VAR:-default} 格式
+        import re
+        pattern = r'\$\{([^}]+)\}'
+        
+        def replace_env(match):
+            expr = match.group(1)
+            if ':-' in expr:
+                var_name, default = expr.split(':-', 1)
+                return os.environ.get(var_name, default)
+            return os.environ.get(expr, '')
+        
+        return re.sub(pattern, replace_env, value)
+    return value
+
+def create_redis_server(
+    host: str = '0.0.0.0',
+    port: int = 6379,
+    max_memory_mb: int = 128,
+    password: Optional[str] = None,
+    config_path: Optional[str] = None
+) -> RedisServer:
+    """
+    创建 Redis 服务器实例
+    
+    可以直接调用此函数创建服务器，然后调用 server.start() 启动
+    
+    Args:
+        host: 监听地址
+        port: 监听端口
+        max_memory_mb: 最大内存 MB
+        password: 认证密码
+        config_path: 配置文件路径，如果提供则会从中读取配置
+    
+    Returns:
+        RedisServer 实例
+    
+    Example:
+        # 直接使用参数
+        server = create_redis_server(port=6380, max_memory_mb=256)
+        server.start()
+        
+        # 从配置文件创建
+        server = create_redis_server(config_path='./config.yaml')
+        server.start()
+    """
+    # 如果提供了配置文件，从中加载配置
+    if config_path:
+        config = load_config(config_path)
+        redis_config = config.get('redis', {})
+        server_config = redis_config.get('server', {})
+        
+        # 配置文件中的值作为默认值，参数优先
+        host = host if host != '0.0.0.0' else expand_env_vars(server_config.get('host', host))
+        port = port if port != 6379 else int(expand_env_vars(server_config.get('port', port)))
+        max_memory_mb = max_memory_mb if max_memory_mb != 128 else int(expand_env_vars(server_config.get('max_memory', max_memory_mb)))
+        if password is None:
+            password = expand_env_vars(server_config.get('password', ''))
+            if password == '':
+                password = None
+    
+    return RedisServer(
+        host=host,
+        port=port,
+        max_memory_mb=max_memory_mb,
+        password=password
+    )
+
+
+def run_redis_server(
+    host: str = '0.0.0.0',
+    port: int = 6379,
+    max_memory_mb: int = 128,
+    password: Optional[str] = None,
+    config_path: Optional[str] = None,
+    blocking: bool = False
+) -> Optional[RedisServer]:
+    """
+    运行 Redis 服务器
+    
+    Args:
+        host: 监听地址
+        port: 监听端口
+        max_memory_mb: 最大内存 MB
+        password: 认证密码
+        config_path: 配置文件路径
+        blocking: 是否阻塞运行。如果为 False，将在后台线程运行
+    
+    Returns:
+        如果 blocking=False，返回 RedisServer 实例；否则返回 None
+    
+    Example:
+        # 阻塞运行（默认）
+        run_redis_server(port=6379)
+        
+        # 后台运行
+        server = run_redis_server(port=6379, blocking=False)
+        # ... 做其他事情 ...
+        server.stop()  # 停止服务器
+    """
+    server = create_redis_server(
+        host=host,
+        port=port,
+        max_memory_mb=max_memory_mb,
+        password=password,
+        config_path=config_path
+    )
+    
+    if blocking:
+        # 阻塞模式：直接运行
+        server.start()
+        return None
+    else:
+        # 非阻塞模式：在后台线程运行
+        server_thread = threading.Thread(target=server.start, daemon=True)
+        server_thread.start()
+        # 等待服务器启动
+        time.sleep(0.1)
+        return server
+
+
+def start_redis_server():
+    """命令行入口"""
     parser = argparse.ArgumentParser(description='Python 实现的轻量级 Redis 服务端')
-    parser.add_argument('--host', default='0.0.0.0', help='监听地址 (默认: 0.0.0.0)')
-    parser.add_argument('--port', type=int, default=6379, help='监听端口 (默认: 6379)')
-    parser.add_argument('--max-memory', type=int, default=128, help='最大内存 MB (默认: 128)')
-    parser.add_argument('--password', default=None, help='认证密码 (可选)')
+    parser.add_argument('--host', default=None, help='监听地址')
+    parser.add_argument('--port', type=int, default=None, help='监听端口')
+    parser.add_argument('--max-memory', type=int, default=None, help='最大内存 MB')
+    parser.add_argument('--password', default=None, help='认证密码')
+    parser.add_argument('--config', default=None, help='配置文件路径')
     parser.add_argument('--daemon', action='store_true', help='以守护进程运行')
     
     args = parser.parse_args()
     
+    # 确定配置文件路径
+    config_path = args.config
+    if config_path is None:
+        # 尝试查找默认配置文件
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        possible_paths = [
+            os.path.join(script_dir, '..', 'config.yaml'),
+            os.path.join(script_dir, '..', '..', 'config.yaml'),
+            './config.yaml',
+        ]
+        for path in possible_paths:
+            if os.path.exists(path):
+                config_path = path
+                break
+    
+    # 加载配置文件
+    config = {}
+    if config_path:
+        config = load_config(config_path)
+    
+    # 从配置文件获取 redis.server 配置
+    redis_config = config.get('redis', {})
+    server_config = redis_config.get('server', {})
+    
+    # 合并命令行参数和配置文件 (命令行优先)
+    host = args.host if args.host is not None else expand_env_vars(server_config.get('host', '0.0.0.0'))
+    port = args.port if args.port is not None else expand_env_vars(server_config.get('port', 6379))
+    max_memory = args.max_memory if args.max_memory is not None else expand_env_vars(server_config.get('max_memory', 128))
+    password = args.password if args.password is not None else expand_env_vars(server_config.get('password', ''))
+    
+    # 转换类型
+    if isinstance(port, str):
+        port = int(port)
+    if isinstance(max_memory, str):
+        max_memory = int(max_memory)
+    if password == '' or password is None:
+        password = None
+    
     server = RedisServer(
-        host=args.host,
-        port=args.port,
-        max_memory_mb=args.max_memory,
-        password=args.password
+        host=host,
+        port=port,
+        max_memory_mb=max_memory,
+        password=password
     )
     
     # 信号处理
@@ -965,4 +1151,4 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    start_redis_server()

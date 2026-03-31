@@ -1,9 +1,15 @@
+from turtle import st
+
 import uvicorn
 from core.config import cfg
+if cfg.get("redis.server.enabled", False):
+        from tools.redis_server import run_redis_server
+        run_redis_server(config_path="config.yaml")
 from core.print import print_warning, print_info, print_success
 import threading
 from driver.auth import start_auth_service   
 import os
+
 if __name__ == '__main__':
     print("环境变量:")
     for k,v in os.environ.items():
@@ -57,6 +63,7 @@ if __name__ == '__main__':
         print_success("已开启定时任务")
     else:
         print_warning("未开启定时任务")
+    
     if cfg.get("gather.content_auto_check",False):
         from jobs import start_fix_article
         start_fix_article()
