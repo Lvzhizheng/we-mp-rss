@@ -77,6 +77,7 @@ def start_sync_content():
     - 根据配置的间隔时间设置定时任务
     - 清除现有任务队列和调度器中的所有作业
     - 添加新的定时同步任务并启动调度器
+    - 立即执行一次同步任务
     
     Args:
         无显式参数，从配置中读取以下设置：
@@ -101,5 +102,8 @@ def start_sync_content():
     job_id=scheduler.add_cron_job(do_sync,cron_expr=cron_exp)
     print_success(f"已添自动同步文章内容任务: {job_id}")
     scheduler.start()
+    # 立即执行一次
+    do_sync()
+    print_success("已添加首次执行任务到队列")
 if __name__ == "__main__":
     fetch_articles_without_content()
