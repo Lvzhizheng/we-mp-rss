@@ -8,11 +8,17 @@
     python redis_server.py --config ../config.yaml
 
 支持命令:
-    PING, ECHO, SET, GET, DEL, EXISTS, KEYS, TTL, EXPIRE
-    INCR, DECR, LPUSH, RPUSH, LPOP, RPOP, LLEN, LRANGE
-    HSET, HGET, HDEL, HGETALL, HEXISTS, HKEYS, HVALS
-    SADD, SREM, SMEMBERS, SISMEMBER, SCARD
-    INFO, DBSIZE, FLUSHDB, FLUSHALL, SAVE, SHUTDOWN
+    键值操作: SET, GET, DEL, EXISTS, KEYS, TTL, EXPIRE, EXPIREAT,
+              PEXPIRE, PEXPIREAT, PERSIST, PTTL, TYPE
+              MGET, MSET, MSETNX, SETNX, SETEX, GETSET
+    计数器:   INCR, DECR, INCRBY, DECRBY, INCRBYFLOAT
+    List:     LPUSH, RPUSH, LPOP, RPOP, LLEN, LRANGE, LTRIM,
+              LINDEX, LSET, RPOPLPUSH, BLPOP, BRPOP
+    Hash:     HSET, HMSET, HMGET, HGET, HGETALL, HDEL, HEXISTS,
+              HKEYS, HVALS, HLEN, HINCRBY, HINCRBYFLOAT, HSETNX
+    Set:      SADD, SREM, SMEMBERS, SISMEMBER, SCARD
+    服务器:   PING, ECHO, AUTH, INFO, DBSIZE, FLUSHDB, FLUSHALL,
+              SAVE, QUIT, SHUTDOWN, COMMAND, CONFIG
 """
 
 import socket
@@ -322,8 +328,73 @@ class MemoryStore:
             return lst[start:]
         return lst[start:end + 1]
     
+    def ltrim(self, key: str, start: int, end: int) -> bool:
+        """裁剪列表，只保留指定范围内的元素"""
+        with self.lock:
+            if self.is_expired(key) or key not in self.data:
+                return True
+            if self.type_map.get(key) != 'list':
+                raise RedisError("WRONGTYPE Operation against a key holding the wrong kind of value")
+            
+            lst = self.data[key]
+            length = len(lst)
+            
+            # 处理负索引
+            if start < 0:
+                start = max(0, length + start)
+            if end < 0:
+                end = length + end
+            
+            if start > end or start >= length:
+                self.data[key] = []
+            else:
+                end = min(end, length - 1)
+                self.data[key] = lst[start:end + 1]
+            
+            return True
+    
+    def lindex(self, key: str, index: int) -> Optional[Any]:
+        """获取列表指定索引的元素"""
+        if self.is_expired(key) or key not in self.data:
+            return None
+        if self.type_map.get(key) != 'list':
+            raise RedisError("WRONGTYPE Operation against a key holding the wrong kind of value")
+        
+        lst = self.data[key]
+        length = len(lst)
+        
+        # 处理负索引
+        if index < 0:
+            index = length + index
+        
+        if index < 0 or index >= length:
+            return None
+        return lst[index]
+    
+    def lset(self, key: str, index: int, value: Any) -> bool:
+        """设置列表指定索引的元素"""
+        with self.lock:
+            if self.is_expired(key) or key not in self.data:
+                raise RedisError("no such key")
+            if self.type_map.get(key) != 'list':
+                raise RedisError("WRONGTYPE Operation against a key holding the wrong kind of value")
+            
+            lst = self.data[key]
+            length = len(lst)
+            
+            # 处理负索引
+            if index < 0:
+                index = length + index
+            
+            if index < 0 or index >= length:
+                raise RedisError("index out of range")
+            
+            lst[index] = value
+            return True
+    
     # Hash 操作
-    def hset(self, key: str, field: str, value: Any) -> int:
+    def hset(self, key: str, field: str = None, value: Any = None, mapping: dict = None) -> int:
+        """设置哈希字段，支持单字段和多字段"""
         with self.lock:
             if key not in self.data:
                 self.data[key] = {}
@@ -331,9 +402,93 @@ class MemoryStore:
             elif self.type_map.get(key) != 'hash':
                 raise RedisError("WRONGTYPE Operation against a key holding the wrong kind of value")
             
-            is_new = field not in self.data[key]
+            count = 0
+            # 支持多字段设置
+            if mapping:
+                for f, v in mapping.items():
+                    if f not in self.data[key]:
+                        count += 1
+                    self.data[key][f] = v
+            elif field is not None:
+                is_new = field not in self.data[key]
+                self.data[key][field] = value
+                count = 1 if is_new else 0
+            
+            return count
+    
+    def hmset(self, key: str, mapping: dict) -> bool:
+        """批量设置哈希字段"""
+        self.hset(key=key, mapping=mapping)
+        return True
+    
+    def hmget(self, key: str, *fields) -> List[Optional[Any]]:
+        """批量获取哈希字段"""
+        if self.is_expired(key) or key not in self.data:
+            return [None] * len(fields)
+        if self.type_map.get(key) != 'hash':
+            raise RedisError("WRONGTYPE Operation against a key holding the wrong kind of value")
+        return [self.data[key].get(f) for f in fields]
+    
+    def hlen(self, key: str) -> int:
+        """获取哈希字段数量"""
+        if self.is_expired(key) or key not in self.data:
+            return 0
+        if self.type_map.get(key) != 'hash':
+            raise RedisError("WRONGTYPE Operation against a key holding the wrong kind of value")
+        return len(self.data[key])
+    
+    def hincrby(self, key: str, field: str, increment: int = 1) -> int:
+        """哈希字段增量"""
+        with self.lock:
+            if key not in self.data:
+                self.data[key] = {}
+                self.type_map[key] = 'hash'
+            elif self.type_map.get(key) != 'hash':
+                raise RedisError("WRONGTYPE Operation against a key holding the wrong kind of value")
+            
+            value = self.data[key].get(field, '0')
+            try:
+                value = int(value)
+            except (ValueError, TypeError):
+                raise RedisError("value is not an integer or out of range")
+            
+            new_value = value + increment
+            self.data[key][field] = str(new_value)
+            return new_value
+    
+    def hincrbyfloat(self, key: str, field: str, increment: float) -> str:
+        """哈希字段浮点增量"""
+        with self.lock:
+            if key not in self.data:
+                self.data[key] = {}
+                self.type_map[key] = 'hash'
+            elif self.type_map.get(key) != 'hash':
+                raise RedisError("WRONGTYPE Operation against a key holding the wrong kind of value")
+            
+            value = self.data[key].get(field, '0')
+            try:
+                value = float(value)
+            except (ValueError, TypeError):
+                raise RedisError("value is not a valid float")
+            
+            new_value = value + increment
+            result = str(new_value)
+            self.data[key][field] = result
+            return result
+    
+    def hsetnx(self, key: str, field: str, value: Any) -> bool:
+        """仅当字段不存在时设置"""
+        with self.lock:
+            if key not in self.data:
+                self.data[key] = {}
+                self.type_map[key] = 'hash'
+            elif self.type_map.get(key) != 'hash':
+                raise RedisError("WRONGTYPE Operation against a key holding the wrong kind of value")
+            
+            if field in self.data[key]:
+                return False
             self.data[key][field] = value
-            return 1 if is_new else 0
+            return True
     
     def hget(self, key: str, field: str) -> Optional[Any]:
         if self.is_expired(key) or key not in self.data:
@@ -628,13 +783,112 @@ class RedisServer:
                 return RedisError("wrong number of arguments for 'expire' command")
             return 1 if self.store.set_ttl(args[0], int(args[1])) else 0
         
-        elif cmd == 'TYPE':
+        elif cmd == 'EXPIREAT':
+            if len(args) < 2:
+                return RedisError("wrong number of arguments for 'expireat' command")
+            ttl = int(args[1]) - int(time.time())
+            return 1 if self.store.set_ttl(args[0], ttl) else 0
+        
+        elif cmd == 'PEXPIRE':
+            if len(args) < 2:
+                return RedisError("wrong number of arguments for 'pexpire' command")
+            return 1 if self.store.set_ttl(args[0], int(args[1]) // 1000) else 0
+        
+        elif cmd == 'PEXPIREAT':
+            if len(args) < 2:
+                return RedisError("wrong number of arguments for 'pexpireat' command")
+            ttl = (int(args[1]) // 1000) - int(time.time())
+            return 1 if self.store.set_ttl(args[0], ttl) else 0
+        
+        elif cmd == 'PERSIST':
             if len(args) < 1:
-                return RedisError("wrong number of arguments for 'type' command")
-            key = args[0]
-            if self.store.is_expired(key) or key not in self.store.data:
-                return 'none'
-            return self.store.type_map.get(key, 'string')
+                return RedisError("wrong number of arguments for 'persist' command")
+            if args[0] in self.store.expires:
+                del self.store.expires[args[0]]
+                return 1
+            return 0
+        
+        elif cmd == 'PTTL':
+            if len(args) < 1:
+                return RedisError("wrong number of arguments for 'pttl' command")
+            ttl = self.store.get_ttl(args[0])
+            if ttl == -1:
+                return -1
+            if ttl == -2:
+                return -2
+            return ttl * 1000
+        
+        elif cmd == 'MGET':
+            if len(args) < 1:
+                return RedisError("wrong number of arguments for 'mget' command")
+            return [self.store.get(k) for k in args]
+        
+        elif cmd == 'MSET':
+            if len(args) < 2 or len(args) % 2 != 0:
+                return RedisError("wrong number of arguments for 'mset' command")
+            i = 0
+            while i < len(args):
+                self.store.set(args[i], args[i + 1])
+                i += 2
+            return 'OK'
+        
+        elif cmd == 'MSETNX':
+            if len(args) < 2 or len(args) % 2 != 0:
+                return RedisError("wrong number of arguments for 'msetnx' command")
+            # 检查是否有已存在的 key
+            for i in range(0, len(args), 2):
+                if args[i] in self.store.data and not self.store.is_expired(args[i]):
+                    return 0
+            # 设置所有 key
+            i = 0
+            while i < len(args):
+                self.store.set(args[i], args[i + 1])
+                i += 2
+            return 1
+        
+        elif cmd == 'SETNX':
+            if len(args) < 2:
+                return RedisError("wrong number of arguments for 'setnx' command")
+            if args[0] in self.store.data and not self.store.is_expired(args[0]):
+                return 0
+            self.store.set(args[0], args[1])
+            return 1
+        
+        elif cmd == 'SETEX':
+            if len(args) < 3:
+                return RedisError("wrong number of arguments for 'setex' command")
+            self.store.set(args[0], args[2], int(args[1]))
+            return 'OK'
+        
+        elif cmd == 'GETSET':
+            if len(args) < 2:
+                return RedisError("wrong number of arguments for 'getset' command")
+            old_value = self.store.get(args[0])
+            self.store.set(args[0], args[1])
+            return old_value
+        
+        elif cmd == 'INCRBY':
+            if len(args) < 2:
+                return RedisError("wrong number of arguments for 'incrby' command")
+            return self.store.incrby(args[0], int(args[1]))
+        
+        elif cmd == 'DECRBY':
+            if len(args) < 2:
+                return RedisError("wrong number of arguments for 'decrby' command")
+            return self.store.incrby(args[0], -int(args[1]))
+        
+        elif cmd == 'INCRBYFLOAT':
+            if len(args) < 2:
+                return RedisError("wrong number of arguments for 'incrbyfloat' command")
+            value = self.store.get(args[0])
+            if value is None:
+                value = '0'
+            try:
+                new_value = float(value) + float(args[1])
+                self.store.set(args[0], str(new_value))
+                return str(new_value)
+            except (ValueError, TypeError):
+                return RedisError("value is not a valid float")
         
         # 计数器
         elif cmd == 'INCR':
@@ -647,10 +901,13 @@ class RedisServer:
                 return RedisError("wrong number of arguments for 'decr' command")
             return self.store.decr(args[0])
         
-        elif cmd == 'INCRBY':
-            if len(args) < 2:
-                return RedisError("wrong number of arguments for 'incrby' command")
-            return self.store.incrby(args[0], int(args[1]))
+        elif cmd == 'TYPE':
+            if len(args) < 1:
+                return RedisError("wrong number of arguments for 'type' command")
+            key = args[0]
+            if self.store.is_expired(key) or key not in self.store.data:
+                return 'none'
+            return self.store.type_map.get(key, 'string')
         
         # List 操作
         elif cmd == 'LPUSH':
@@ -673,6 +930,34 @@ class RedisServer:
                 return RedisError("wrong number of arguments for 'rpop' command")
             return self.store.rpop(args[0])
         
+        elif cmd == 'RPOPLPUSH':
+            if len(args) < 2:
+                return RedisError("wrong number of arguments for 'rpoplpush' command")
+            value = self.store.rpop(args[0])
+            if value is not None:
+                self.store.lpush(args[1], value)
+            return value
+        
+        elif cmd == 'BLPOP':
+            if len(args) < 2:
+                return RedisError("wrong number of arguments for 'blpop' command")
+            # 简化实现：不阻塞，直接尝试获取
+            for key in args[:-1]:
+                value = self.store.lpop(key)
+                if value is not None:
+                    return [key, value]
+            return None
+        
+        elif cmd == 'BRPOP':
+            if len(args) < 2:
+                return RedisError("wrong number of arguments for 'brpop' command")
+            # 简化实现：不阻塞，直接尝试获取
+            for key in args[:-1]:
+                value = self.store.rpop(key)
+                if value is not None:
+                    return [key, value]
+            return None
+        
         elif cmd == 'LLEN':
             if len(args) < 1:
                 return RedisError("wrong number of arguments for 'llen' command")
@@ -683,11 +968,83 @@ class RedisServer:
                 return RedisError("wrong number of arguments for 'lrange' command")
             return self.store.lrange(args[0], int(args[1]), int(args[2]))
         
+        elif cmd == 'LTRIM':
+            if len(args) < 3:
+                return RedisError("wrong number of arguments for 'ltrim' command")
+            self.store.ltrim(args[0], int(args[1]), int(args[2]))
+            return 'OK'
+        
+        elif cmd == 'LINDEX':
+            if len(args) < 2:
+                return RedisError("wrong number of arguments for 'lindex' command")
+            return self.store.lindex(args[0], int(args[1]))
+        
+        elif cmd == 'LSET':
+            if len(args) < 3:
+                return RedisError("wrong number of arguments for 'lset' command")
+            try:
+                self.store.lset(args[0], int(args[1]), args[2])
+                return 'OK'
+            except RedisError as e:
+                return e
+        
         # Hash 操作
         elif cmd == 'HSET':
             if len(args) < 3:
                 return RedisError("wrong number of arguments for 'hset' command")
-            return self.store.hset(args[0], args[1], args[2])
+            # 支持多字段: HSET key field value [field value ...]
+            if len(args) == 3:
+                return self.store.hset(args[0], args[1], args[2])
+            else:
+                # 多字段设置
+                mapping = {}
+                i = 1
+                while i < len(args) - 1:
+                    mapping[args[i]] = args[i + 1]
+                    i += 2
+                return self.store.hset(args[0], mapping=mapping)
+        
+        elif cmd == 'HMSET':
+            if len(args) < 3 or len(args) % 2 == 0:
+                return RedisError("wrong number of arguments for 'hmset' command")
+            mapping = {}
+            i = 1
+            while i < len(args) - 1:
+                mapping[args[i]] = args[i + 1]
+                i += 2
+            self.store.hmset(args[0], mapping)
+            return 'OK'
+        
+        elif cmd == 'HMGET':
+            if len(args) < 2:
+                return RedisError("wrong number of arguments for 'hmget' command")
+            return self.store.hmget(args[0], *args[1:])
+        
+        elif cmd == 'HLEN':
+            if len(args) < 1:
+                return RedisError("wrong number of arguments for 'hlen' command")
+            return self.store.hlen(args[0])
+        
+        elif cmd == 'HINCRBY':
+            if len(args) < 3:
+                return RedisError("wrong number of arguments for 'hincrby' command")
+            try:
+                return self.store.hincrby(args[0], args[1], int(args[2]))
+            except RedisError as e:
+                return e
+        
+        elif cmd == 'HINCRBYFLOAT':
+            if len(args) < 3:
+                return RedisError("wrong number of arguments for 'hincrbyfloat' command")
+            try:
+                return self.store.hincrbyfloat(args[0], args[1], float(args[2]))
+            except RedisError as e:
+                return e
+        
+        elif cmd == 'HSETNX':
+            if len(args) < 3:
+                return RedisError("wrong number of arguments for 'hsetnx' command")
+            return 1 if self.store.hsetnx(args[0], args[1], args[2]) else 0
         
         elif cmd == 'HGET':
             if len(args) < 2:
@@ -767,7 +1124,25 @@ class RedisServer:
         
         elif cmd == 'COMMAND':
             # 返回命令文档 (简化版)
-            return ['SET', 'GET', 'DEL', 'KEYS', 'LPUSH', 'RPUSH', 'HSET', 'HGET', 'SADD']
+            return [
+                # 键值操作
+                'SET', 'GET', 'DEL', 'EXISTS', 'KEYS', 'TTL', 'EXPIRE', 'EXPIREAT',
+                'PEXPIRE', 'PEXPIREAT', 'PERSIST', 'PTTL', 'TYPE',
+                'MGET', 'MSET', 'MSETNX', 'SETNX', 'SETEX', 'GETSET',
+                # 计数器
+                'INCR', 'DECR', 'INCRBY', 'DECRBY', 'INCRBYFLOAT',
+                # List 操作
+                'LPUSH', 'RPUSH', 'LPOP', 'RPOP', 'LLEN', 'LRANGE', 'LTRIM',
+                'LINDEX', 'LSET', 'RPOPLPUSH', 'BLPOP', 'BRPOP',
+                # Hash 操作
+                'HSET', 'HMSET', 'HMGET', 'HGET', 'HGETALL', 'HDEL', 'HEXISTS',
+                'HKEYS', 'HVALS', 'HLEN', 'HINCRBY', 'HINCRBYFLOAT', 'HSETNX',
+                # Set 操作
+                'SADD', 'SREM', 'SMEMBERS', 'SISMEMBER', 'SCARD',
+                # 服务器管理
+                'PING', 'ECHO', 'AUTH', 'INFO', 'DBSIZE', 'FLUSHDB', 'FLUSHALL',
+                'SAVE', 'QUIT', 'SHUTDOWN', 'COMMAND', 'CONFIG'
+            ]
         
         elif cmd == 'CONFIG':
             if len(args) < 2:
