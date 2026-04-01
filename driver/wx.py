@@ -88,6 +88,8 @@ class Wx:
             username: 目标账号的用户名，如果为空则切换到其他可用账号
         """
         print("开始切换账号...")
+        queue_was_running = False
+        
         try:
             # 检查是否已有切换操作在进行
             if getLockStatus():
@@ -96,6 +98,14 @@ class Wx:
             
             # 设置锁状态
             setLockStatus(True)
+            
+            # 暂停任务队列，等待当前任务完成
+            from core.queue import TaskQueue
+            queue_was_running = TaskQueue._is_running
+            if queue_was_running:
+                print_info("暂停任务队列，等待当前任务完成...")
+                TaskQueue.stop()
+                time.sleep(2)  # 等待当前任务完成
             
             self.Token(isClose=False)
             if self._haslogin is False:
@@ -196,7 +206,12 @@ class Wx:
             return False
         finally:
             # 确保锁被释放
-            setLockStatus(False) 
+            setLockStatus(False)
+            # 恢复任务队列
+            if queue_was_running:
+                from core.queue import TaskQueue
+                print_info("恢复任务队列...")
+                TaskQueue.run_task_background() 
     def GetCode(self,CallBack=None,Notice=None):
         self.Notice=Notice
         if  self.check_lock():
