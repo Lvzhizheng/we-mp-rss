@@ -15,6 +15,10 @@
         <div>
             <span style="margin-right: 1rem;">🕐 发布时间: {{article.publish_time}}</span>
             <span>📅 创建时间: {{article.created_at}}</span>
+            <a href="{{article.url}}" target="_blank"  rel="noopener noreferrer">
+                🔗 原文链接
+            </a>
+    </p>
         </div>
     </div>
     
@@ -23,46 +27,44 @@
         <strong>摘要：</strong> {{article.description}}
     </div>
     {% endif %}
-
+  
     <!-- 公众号信息 -->
     <div class="mp-info">
         <div style="width: 48px; height: 48px; background: #e9ecef; border-radius: 4px; display: flex; align-items: center; justify-content: center;">
             {% if article.mp_cover %}
-                <img src="{{article.mp_cover}}" alt="{{article.title}}" width="50px"/>
+                <img src="{{article.mp_cover}}" alt="{{article.title}}" width="50px"/> 
             {% endif %}
         </div>
         <div style="flex: 1;">
-            <div style="font-weight: 500; font-size: 1.1rem;">{{article.mp_name}}</div>
+            <div style="font-weight: 500; font-size: 1.1rem;">
+                  <a href="/views/articles?mp_id={{article.mp_id}}" target="_blank"  style="font-size: 0.9rem;">{{article.mp_name}}</a>
+            </div>
+          
             {% if article.mp_intro %}
             <div class="text-muted" style="font-size: 0.9rem;">{{article.mp_intro}}</div>
             {% endif %}
         </div>
-        <a href="/views/articles?mp_id={{article.mp_id}}" class="btn" style="font-size: 0.9rem;">查看更多文章</a>
+       
     </div>
 </div>
 
 <!-- 文章内容 -->
 <div class="article-content" style="clear: both;">
         <p class="text-muted mt-2"> {{article.content}}</p>
-        <p style="margin-top: 1rem;">
-            <a href="{{article.url}}" target="_blank" class="btn" rel="noopener noreferrer">
-                🔗 原文链接
-            </a>
-        </p>
 </div>
 
 <div class="article-box">
  <!-- 相关文章 -->
     <div class="more-info">
         {%for related_article in related_articles %}
-        <p><a href="/views/article/{{related_article.id}}"  style="font-size: 0.9rem;">{{related_article.title}}</a></p>
+        <p><a href="/views/article/{{related_article.id}}" target="_blank"  style="font-size: 0.9rem;">{{related_article.title}}</a></p>
         {% endfor %}
     </div>
 
       <div class="nav-article" style="text-align: justify; margin-top:2rem;border-top:1px solid #e9ecef;padding-top:1rem;">
         {% if prev_article %}
         <p>
-            <a href="/views/article/{{prev_article.id}}"  style="font-size: 0.9rem;">上一篇: {{prev_article.title}}</a>
+            <a href="/views/article/{{prev_article.id}}"   style="font-size: 0.9rem;">上一篇: {{prev_article.title}}</a>
         </p>
         {% endif %}
         {% if next_article %}
