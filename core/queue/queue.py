@@ -243,13 +243,14 @@ class TaskQueueManager:
             print_error(f"从 Redis 获取历史记录数量失败: {e}")
             return 0
         
-    def add_task(self, task: Callable[..., Any], *args: Any, max_retries: int = 3, **kwargs: Any) -> bool:
+    def add_task(self, task: Callable[..., Any], *args: Any, max_retries: int = 3, task_name: str = None, **kwargs: Any) -> bool:
         """添加任务到队列
         
         Args:
             task: 要执行的任务函数
             *args: 任务函数的参数
             max_retries: 最大重试次数，默认3次
+            task_name: 自定义任务名称（可选），用于显示，如公众号名称
             **kwargs: 任务函数的关键字参数
             
         Returns:
@@ -258,15 +259,16 @@ class TaskQueueManager:
         with self._thread_lock:
             # 检查队列是否已满（如果设置了maxsize）
             try:
-                self._queue.put_nowait((task, args, kwargs, max_retries))
+                # 将 task_name 存储在队列项中
+                self._queue.put_nowait((task, args, kwargs, max_retries, task_name))
             except queue.Full:
                 print_error(f"{self.tag}队列已满，任务添加失败")
                 return False
                 
             # 记录待执行任务
-            task_name = getattr(task, '__name__', str(task))
+            display_name = task_name or getattr(task, '__name__', str(task))
             self._pending_items.append(TaskItem(
-                task_name=task_name,
+                task_name=display_name,
                 args=args,
                 kwargs=kwargs,
                 max_retries=max_retries
@@ -276,7 +278,7 @@ class TaskQueueManager:
             self._save_pending_to_redis()
             self._save_status_to_redis()
             
-        print_success(f"{self.tag}队列任务添加成功\n")
+        print_success(f"{self.tag}队列任务添加成功 [{display_name}]\n")
         return True
         
     def run_task_background(self)->None:
@@ -302,12 +304,16 @@ class TaskQueueManager:
                     # 阻塞获取任务，避免CPU空转
                     task_item = self._queue.get(timeout=timeout)
                     
-                    # 兼容新旧格式：新格式4个元素，旧格式3个元素
-                    if len(task_item) == 4:
+                    # 兼容多种格式：5个元素(新格式带task_name)，4个元素，3个元素(旧格式)
+                    if len(task_item) == 5:
+                        task, args, kwargs, max_retries, custom_task_name = task_item
+                    elif len(task_item) == 4:
                         task, args, kwargs, max_retries = task_item
+                        custom_task_name = None
                     else:
                         task, args, kwargs = task_item
                         max_retries = 3
+                        custom_task_name = None
                     
                     # 从待执行列表中移除
                     with self._thread_lock:
@@ -315,8 +321,8 @@ class TaskQueueManager:
                             self._pending_items.pop(0)
                             self._save_pending_to_redis()
                     
-                    # 记录任务开始
-                    task_name = getattr(task, '__name__', str(task))
+                    # 记录任务开始 - 优先使用自定义名称
+                    task_name = custom_task_name or getattr(task, '__name__', str(task))
                     with self._thread_lock:
                         self._current_task = TaskRecord(
                             task_name=task_name,

@@ -209,7 +209,8 @@ def add_job(feeds:list[Feed]=None,task:MessageTask=None,isTest=False):
         tracker.start_task(task.id, len(feeds))
     
     for feed in feeds:
-        TaskQueue.add_task(do_job,feed,task,isTest)
+        # 使用公众号名称作为任务显示名称
+        TaskQueue.add_task(do_job, feed, task, isTest, task_name=feed.mp_name)
         if isTest:
             print(f"测试任务，{feed.mp_name}，加入队列成功")
             reload_job()
