@@ -39,6 +39,12 @@ class Db:
                     except Exception as e:
                         pass
                     open(db_path, 'w').close()
+            
+            # SQLite 连接参数
+            connect_args = {}
+            if con_str.startswith('sqlite:///'):
+                connect_args = {"check_same_thread": False}
+            
             self.engine = create_engine(con_str,
                                      pool_size=2,          # 最小空闲连接数
                                      max_overflow=20,      # 允许的最大溢出连接数
@@ -48,8 +54,16 @@ class Db:
                                      isolation_level="AUTOCOMMIT",  # 设置隔离级别
                                     #  isolation_level="READ COMMITTED",  # 设置隔离级别
                                     #  query_cache_size=0,
-                                     connect_args={"check_same_thread": False} if con_str.startswith('sqlite:///') else {}
+                                     connect_args=connect_args
                                      )
+            
+            # 为 SQLite 设置 text_factory 处理无效 UTF-8 字符
+            if con_str.startswith('sqlite:///'):
+                @event.listens_for(self.engine, "connect")
+                def set_sqlite_text_factory(dbapi_conn, connection_record):
+                    # 将无效 UTF-8 字符替换为 �
+                    dbapi_conn.text_factory = lambda x: x.decode('utf-8', errors='replace')
+            
             self.session_factory=self.get_session_factory()
             self.ensure_article_columns()
         except Exception as e:
