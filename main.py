@@ -1,5 +1,3 @@
-from turtle import st
-
 import uvicorn
 from core.config import cfg
 if cfg.get("redis.server.enabled", False):

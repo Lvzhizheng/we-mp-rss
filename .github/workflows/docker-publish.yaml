@@ -6,12 +6,7 @@ on:
     branches:
       - main
     paths:  # 仅在指定文件变化时触发（可选）
-      - 'ReadMe.md'
-      - 'README.zh-CN.md'
       - 'core/ver.py'
-      - 'Dockerfile'
-      - 'requirements.txt'
-      - 'config.example.yaml'
 #   release:
 #     types: [published]
 jobs:
