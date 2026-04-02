@@ -532,12 +532,15 @@ const columns = computed(() => {
     {
       title: '正文',
       dataIndex: 'has_content',
-      width: 50,
+      width: 60,
       align: 'center',
       render: ({ record }) => {
         const hasContent = record.has_content === 1
         return h('a-tag', {
-          color: hasContent ? 'green' : 'gray',
+          style: {
+            color: hasContent ? 'green' : 'gray',
+            fontSize: '12px'
+          },
           size: 'small'
         }, hasContent ? '有' : '无')
       }
