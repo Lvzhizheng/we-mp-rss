@@ -3,7 +3,7 @@
 """
 from fastapi import APIRouter, Request, Response
 import httpx
-from urllib.parse import urlparse, urljoin
+from urllib.parse import urlparse, urljoin, quote
 import logging
 import re
 from bs4 import BeautifulSoup
@@ -34,6 +34,33 @@ RESOURCE_TAGS = {
 }
 
 
+def get_base_directory(url: str) -> str:
+    """
+    获取 URL 的基础目录
+    
+    Args:
+        url: 完整 URL
+        
+    Returns:
+        str: 基础目录 URL
+    """
+    try:
+        parsed = urlparse(url)
+        # 去掉查询参数和片段
+        path = parsed.path
+        # 如果有路径，获取目录部分
+        if path and '/' in path:
+            path = path.rsplit('/', 1)[0]
+        else:
+            path = ''
+        
+        base_dir = f"{parsed.scheme}://{parsed.netloc}{path}/"
+        return base_dir
+    except Exception as e:
+        logger.error(f"获取基础目录失败: {str(e)}")
+        return url
+
+
 def rewrite_relative_urls(content: str, base_url: str) -> str:
     """
     重写 HTML 内容中的相对 URL 为绝对 URL
@@ -46,6 +73,12 @@ def rewrite_relative_urls(content: str, base_url: str) -> str:
         str: 重写后的 HTML 内容
     """
     try:
+        # 获取基础目录
+        base_dir = get_base_directory(base_url)
+        
+        logger.info(f"原始 URL: {base_url}")
+        logger.info(f"基础目录: {base_dir}")
+        
         soup = BeautifulSoup(content, 'html.parser')
         
         # 处理各种标签中的 URL
@@ -53,33 +86,47 @@ def rewrite_relative_urls(content: str, base_url: str) -> str:
             for tag in soup.find_all(tag_name):
                 for attr in attrs:
                     if tag.has_attr(attr):
-                        original_url = tag[attr]
-                        if original_url and not original_url.startswith(('http://', 'https://', 'data:', 'mailto:', 'tel:', '#')):
-                            # 转换为绝对 URL
-                            absolute_url = urljoin(base_url, original_url)
-                            # 代理化 URL
-                            proxy_url = f"/proxy/proxy?url={absolute_url}"
-                            tag[attr] = proxy_url
+                        original_url = str(tag[attr])
+                        
+                        # 跳过不需要处理的 URL
+                        if not original_url or original_url.startswith(('data:', 'mailto:', 'tel:', 'javascript:', '#')):
+                            continue
+                        
+                        logger.debug(f"处理 {tag_name}.{attr}: {original_url}")
+                        
+                        # 转换为绝对 URL
+                        absolute_url = urljoin(base_dir, original_url)
+                        
+                        # 代理化 URL（需要 URL 编码）
+                        encoded_url = quote(absolute_url, safe='')
+                        proxy_url = f"/proxy/proxy?url={encoded_url}"
+                        
+                        logger.info(f"重写: {original_url} -> {proxy_url}")
+                        tag[attr] = proxy_url
         
         # 处理 srcset 属性（特殊格式）
         for tag in soup.find_all(['img', 'source']):
             if tag.has_attr('srcset'):
-                srcset = tag['srcset']
+                srcset = str(tag['srcset'])
                 urls = []
                 for part in srcset.split(','):
                     part = part.strip()
                     if part:
                         # 提取 URL 和描述符
-                        url_part = part.split()[0]
-                        descriptor = ' '.join(part.split()[1:]) if len(part.split()) > 1 else ''
+                        parts = part.split()
+                        url_part = parts[0]
+                        descriptor = ' '.join(parts[1:]) if len(parts) > 1 else ''
                         
                         if url_part and not url_part.startswith(('http://', 'https://', 'data:')):
-                            absolute_url = urljoin(base_url, url_part)
-                            proxy_url = f"/proxy/proxy?url={absolute_url}"
+                            absolute_url = urljoin(base_dir, url_part)
+                            encoded_url = quote(absolute_url, safe='')
+                            proxy_url = f"/proxy/proxy?url={encoded_url}"
+                            
                             if descriptor:
                                 urls.append(f"{proxy_url} {descriptor}")
                             else:
                                 urls.append(proxy_url)
+                            logger.info(f"重写 srcset: {url_part} -> {proxy_url}")
                         else:
                             urls.append(part)
                 
@@ -87,27 +134,29 @@ def rewrite_relative_urls(content: str, base_url: str) -> str:
         
         # 处理 style 属性中的 url()
         for tag in soup.find_all(attrs={'style': True}):
-            style = tag['style']
-            tag['style'] = rewrite_css_urls(style, base_url)
+            style = str(tag['style'])
+            tag['style'] = rewrite_css_urls(style, base_dir)
         
         # 处理内联 CSS
         for style_tag in soup.find_all('style'):
             if style_tag.string:
-                style_tag.string = rewrite_css_urls(style_tag.string, base_url)
+                style_tag.string = rewrite_css_urls(str(style_tag.string), base_dir)
         
         # 添加或更新 base 标签
         base_tag = soup.find('base')
         if not base_tag:
             head = soup.find('head')
             if head:
-                new_base = soup.new_tag('base', href=base_url)
+                new_base = soup.new_tag('base', href=base_dir)
                 head.insert(0, new_base)
+                logger.info(f"添加 base 标签: {base_dir}")
         else:
-            base_tag['href'] = base_url
+            base_tag['href'] = base_dir
+            logger.info(f"更新 base 标签: {base_dir}")
         
         return str(soup)
     except Exception as e:
-        logger.error(f"重写 URL 失败: {str(e)}")
+        logger.error(f"重写 URL 失败: {str(e)}", exc_info=True)
         return content
 
 
@@ -130,7 +179,8 @@ def rewrite_css_urls(css_content: str, base_url: str) -> str:
             url = match.group(1)
             if url and not url.startswith(('http://', 'https://', 'data:', 'about:')):
                 absolute_url = urljoin(base_url, url)
-                proxy_url = f"/proxy/proxy?url={absolute_url}"
+                encoded_url = quote(absolute_url, safe='')
+                proxy_url = f"/proxy/proxy?url={encoded_url}"
                 return f'url("{proxy_url}")'
             return match.group(0)
         
@@ -178,6 +228,8 @@ async def proxy_get_request(path: str, request: Request):
     """
     # 从查询参数中获取目标 URL
     target_url = request.query_params.get("url")
+    
+    logger.info(f"收到代理请求: {target_url}")
     
     if not target_url:
         return Response(
@@ -228,6 +280,9 @@ async def proxy_get_request(path: str, request: Request):
             content = response.content
             content_type = response.headers.get('content-type', 'text/html')
             
+            logger.info(f"代理请求: {target_url}")
+            logger.info(f"响应类型: {content_type}")
+            
             # 处理 HTML 内容 - 重写相对路径
             if 'html' in content_type.lower():
                 try:
@@ -240,21 +295,24 @@ async def proxy_get_request(path: str, request: Request):
                     
                     # 重新编码
                     content = html_content.encode(encoding)
+                    logger.info("HTML 内容处理完成")
                 except Exception as e:
-                    logger.error(f"处理 HTML 内容失败: {str(e)}")
+                    logger.error(f"处理 HTML 内容失败: {str(e)}", exc_info=True)
             
             # 处理 CSS 内容
             elif 'css' in content_type.lower():
                 try:
+                    base_dir = get_base_directory(target_url)
                     encoding = response.encoding or 'utf-8'
                     css_content = content.decode(encoding, errors='ignore')
                     
                     # 重写 CSS 中的 url()
-                    css_content = rewrite_css_urls(css_content, target_url)
+                    css_content = rewrite_css_urls(css_content, base_dir)
                     
                     content = css_content.encode(encoding)
+                    logger.info("CSS 内容处理完成")
                 except Exception as e:
-                    logger.error(f"处理 CSS 内容失败: {str(e)}")
+                    logger.error(f"处理 CSS 内容失败: {str(e)}", exc_info=True)
             
             response_headers = dict(response.headers)
             
