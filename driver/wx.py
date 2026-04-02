@@ -10,7 +10,7 @@ from PIL import Image
 from .success import Success
 import time
 import os
-from driver.success import getStatus,getLockStatus,setLockStatus
+from driver.success import getStatus
 from driver.store import Store
 import re
 from threading import Timer, Lock
@@ -92,14 +92,6 @@ class Wx:
         content_queue_was_running = False
         
         try:
-            # 检查是否已有切换操作在进行
-            if getLockStatus():
-                print_warning("已有切换账号操作在进行中，请稍后")
-                return False
-            
-            # 设置锁状态
-            setLockStatus(True)
-            
             # 暂停主队列和内容队列，等待当前任务完成
             from core.queue import TaskQueue, ContentTaskQueue
             main_queue_was_running = TaskQueue._is_running
@@ -238,18 +230,13 @@ class Wx:
                     return False
             else:
                 print_warning("未找到账号信息区域")
+                raise Exception("未找到账号信息区域，无法切换账号")
                 return False
                 
         except Exception as e:
             print_error(f"切换账号时发生错误: {str(e)}")
             return False
         finally:
-            # 确保锁被释放
-            try:
-                setLockStatus(False)
-            except Exception as e:
-                print_error(f"释放锁失败: {e}")
-            
             # 恢复任务队列
             try:
                 from core.queue import TaskQueue, ContentTaskQueue
@@ -262,6 +249,8 @@ class Wx:
                     print_info("恢复内容任务队列...")
                     ContentTaskQueue.run_task_background()
                     print_success("内容任务队列已恢复")
+                self.cleanup_resources()  # 切换账号后清理资源，确保环境干净
+                self.Close()  # 切换账号后关闭浏览器，确保新登录环境干净
             except Exception as e:
                 print_error(f"恢复队列失败: {e}") 
     def GetCode(self,CallBack=None,Notice=None):
@@ -326,14 +315,6 @@ class Wx:
             if not getStatus():
                 print_warning("登录状态检查失败")
                 return None
-            
-            # 检查是否已有锁，记录是否由本方法获取
-            lock_acquired_here = False
-            if getLockStatus():
-                print_info("锁已被其他操作持有，继续执行")
-            else:
-                setLockStatus(True)
-                lock_acquired_here = True
 
             from driver.token import get as get_val
             token = str(get_val("token", ""))
@@ -381,9 +362,6 @@ class Wx:
             print_error(f"Token操作失败: {str(e)}")
             return None
         finally:
-            # 只有在本方法获取的锁才释放，避免影响 switch_account 的锁
-            if lock_acquired_here:
-                setLockStatus(False)
             # 不在这里清理，让Call_Success处理清理
             if isClose:
                 self.controller.cleanup()
