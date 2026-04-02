@@ -10,7 +10,7 @@ on:
 #   release:
 #     types: [published]
 jobs:
-  build-and-push:
+  build-and-push-docker-latest:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
