@@ -3,10 +3,10 @@ import { ref, reactive, onMounted } from 'vue'
 import { getFeedStatus } from '@/api/cascade'
 import type { FeedStatus } from '@/api/cascade'
 import { Message } from '@arco-design/web-vue'
-import { IconRefresh } from '@arco-design/web-vue/es/icon'
+import { IconRefresh, IconUser } from '@arco-design/web-vue/es/icon'
 
 const feedStatusColumns = [
-  { title: '公众号名称', dataIndex: 'mp_name', ellipsis: true },
+  { title: '公众号', slotName: 'mp_info', ellipsis: true },
   { title: '文章数', dataIndex: 'article_count', width: 80 },
   { title: '更新状态', slotName: 'update_status', width: 100 },
   { title: '最近文章', slotName: 'latest_article_time', width: 160 },
@@ -20,7 +20,7 @@ const totalFeeds = ref(0)
 const feedStatusLoading = ref(false)
 
 const feedStatusPagination = reactive({
-  limit: 10,
+  limit: 12,
   offset: 0
 })
 
@@ -117,13 +117,7 @@ onMounted(() => {
         </a-button>
       </template>
 
-      <a-alert 
-        type="info" 
-        show-icon
-        style="margin-bottom: 16px;"
-      >
-        显示系统中所有公众号的更新状态和任务执行情况
-      </a-alert>
+
 
       <a-table
         :columns="feedStatusColumns"
@@ -138,6 +132,21 @@ onMounted(() => {
           onChange: handleFeedStatusPageChange
         }"
       >
+        <template #mp_info="{ record }">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <img
+              v-if="record.mp_cover"
+              :src="record.mp_cover"
+              :alt="record.mp_name"
+              style="width: 32px; height: 32px; border-radius: 4px; object-fit: cover;"
+            />
+            <span v-else style="width: 32px; height: 32px; border-radius: 4px; background: #f2f3f5; display: flex; align-items: center; justify-content: center;">
+              <icon-user style="color: #c9cdd4;" />
+            </span>
+            <span>{{ record.mp_name }}</span>
+          </div>
+        </template>
+
         <template #update_status="{ record }">
           <a-tag :color="getUpdateStatusColor(record.update_status)">
             {{ getUpdateStatusText(record.update_status) }}
