@@ -373,7 +373,7 @@ class TaskQueueManager:
             # 广播队列状态更新
             _broadcast_queue_status()
             
-        print_success(f"{self.tag}队列任务添加成功 [{display_name}]\n")
+        # print_success(f"{self.tag}队列任务添加成功 [{display_name}]\n")
         return True
         
     def run_task_background(self)->None:
