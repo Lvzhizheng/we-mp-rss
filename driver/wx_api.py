@@ -552,6 +552,27 @@ class WeChatAPI:
                 cookie_dict[pair] = ""
         
         return cookie_dict
+    
+    def _convert_cookies_to_list(self) -> list:
+        """
+        将 requests.Session 的 cookies 转换为列表格式
+        兼容 Store.save() 期望的格式（类似 Playwright 的 get_cookies()）
+        
+        Returns:
+            cookies 列表，每个元素包含 name, value, domain, path, expires 等字段
+        """
+        cookies_list = []
+        for cookie in self.session.cookies:
+            cookie_item = {
+                'name': cookie.name,
+                'value': cookie.value,
+                'domain': cookie.domain if cookie.domain else '.weixin.qq.com',
+                'path': cookie.path if cookie.path else '/',
+            }
+            if cookie.expires:
+                cookie_item['expires'] = cookie.expires
+            cookies_list.append(cookie_item)
+        return cookies_list
     def _format_cookies_string(self) -> str:
         """
         格式化cookies为字符串
@@ -628,6 +649,8 @@ class WeChatAPI:
                 'wx_user_count': 0
             }
             from driver.cookies import expire
+            # 将 requests cookies 转换为列表格式（兼容 Store.save）
+            cookies_list = self._convert_cookies_to_list()
             # 将cookie转换为字典
             login_data = {
                             'cookies': self.cookies,
@@ -635,10 +658,10 @@ class WeChatAPI:
                             'token': self.token,
                             'fingerprint': self.fingerprint,
                             'wx_login_url': self.qr_code_path,
-                            'expiry': expire(self.cookies_dict)
+                            'expiry': expire(self.cookies_dict if self.cookies_dict else cookies_list)
             }
             from driver.store import Store
-            Store.save(self.cookies)
+            Store.save(cookies_list)
             set_token(login_data,account_info)
             if self.login_callback:
                 self.login_callback(login_data, account_info)
