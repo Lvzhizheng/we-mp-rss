@@ -289,20 +289,25 @@ async def get_articles(
 ):
     session = DB.get_session()
     try:
-      
+        from sqlalchemy import case, func
         
-        # 构建查询条件
-        query = session.query(ArticleBase)
-        if has_content:
-            query=session.query(Article)
+        # 构建查询条件 - 使用 ArticleBase 并通过 case 表达式判断是否有正文
+        # 避免加载大量 content 数据
+        query = session.query(
+            ArticleBase,
+            case(
+                ((Article.content.isnot(None)) & (Article.content != ''), 1),
+                else_=0
+            ).label('has_content')
+        )
         if status:
-            query = query.filter(Article.status == status)
+            query = query.filter(ArticleBase.status == status)
         else:
-            query = query.filter(Article.status != DATA_STATUS.DELETED)
+            query = query.filter(ArticleBase.status != DATA_STATUS.DELETED)
         if mp_id:
-            query = query.filter(Article.mp_id == mp_id)
+            query = query.filter(ArticleBase.mp_id == mp_id)
         if only_favorite:
-            query = query.filter(Article.is_favorite == 1)
+            query = query.filter(ArticleBase.is_favorite == 1)
         if search:
             query = query.filter(
                format_search_kw(search)
@@ -310,10 +315,10 @@ async def get_articles(
         
         # 获取总数
         total = query.count()
-        query= query.order_by(Article.publish_time.desc()).offset(offset).limit(limit)
+        query= query.order_by(ArticleBase.publish_time.desc()).offset(offset).limit(limit)
         # query= query.order_by(Article.id.desc()).offset(offset).limit(limit)
         # 分页查询（按发布时间降序）
-        articles = query.all()
+        results = query.all()
         
         # 打印生成的 SQL 语句（包含分页参数）
         print_warning(query.statement.compile(compile_kwargs={"literal_binds": True}))
@@ -321,17 +326,21 @@ async def get_articles(
         # 查询公众号名称
         from core.models.feed import Feed
         mp_names = {}
-        for article in articles:
+        for result in results:
+            article = result[0]  # ArticleBase 对象
             if article.mp_id and article.mp_id not in mp_names:
                 feed = session.query(Feed).filter(Feed.id == article.mp_id).first()
                 mp_names[article.mp_id] = feed.mp_name if feed else "未知公众号"
         
         # 合并公众号名称到文章列表
         article_list = []
-        for article in articles:
-            article_dict = article.__dict__
+        for result in results:
+            article = result[0]  # ArticleBase 对象
+            has_content_val = result[1]  # has_content 计算值
+            article_dict = article.__dict__.copy()
             article_dict["mp_name"] = mp_names.get(article.mp_id, "未知公众号")
             article_dict["is_favorite"] = int(getattr(article, "is_favorite", 0) or 0)
+            article_dict["has_content"] = has_content_val
             article_list.append(article_dict)
         
         from .base import success_response

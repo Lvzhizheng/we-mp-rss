@@ -390,6 +390,7 @@ const allColumnOptions = [
   { key: 'pic_url', label: '题图', required: false },
   { key: 'title', label: '文章标题', required: true },
   { key: 'mp_id', label: '公众号', required: false },
+  { key: 'has_content', label: '正文', required: false },
   { key: 'copyright_stat', label: '原创', required: false },
   { key: 'item_show_types', label: '类型', required: false },
   { key: 'created_at', label: '更新时间', required: false },
@@ -526,6 +527,19 @@ const columns = computed(() => {
             handleMpClick(record.mp_id)
           }
         }, record.mp_name || mp?.name || record.mp_id)
+      }
+    },
+    {
+      title: '正文',
+      dataIndex: 'has_content',
+      width: 50,
+      align: 'center',
+      render: ({ record }) => {
+        const hasContent = record.has_content === 1
+        return h('a-tag', {
+          color: hasContent ? 'green' : 'gray',
+          size: 'small'
+        }, hasContent ? '有' : '无')
       }
     },
     {
