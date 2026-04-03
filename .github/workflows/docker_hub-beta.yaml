@@ -50,5 +50,5 @@ jobs:
           push: true
         #   tags: ${{ steps.meta.outputs.tags }}
           tags: |
-            ${{ env.IMAGE_NAME }}:beta
+            ${{ env.IMAGE_NAME }}-beta:${{ github.sha }}
           labels: ${{ steps.meta.outputs.labels }}
