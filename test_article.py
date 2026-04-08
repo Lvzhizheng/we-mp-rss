@@ -154,10 +154,10 @@ if __name__=="__main__":
     # testLogin()
 
     # test_screenshot()
-    # test_Gather_Article()
+    test_Gather_Article()
     # text_fix()    
     # testWx_Api()
-    test_fetch_articles_without_content()
+    # test_fetch_articles_without_content()
     # testWeb()
     # testNotice()
     # testMd2Doc()
