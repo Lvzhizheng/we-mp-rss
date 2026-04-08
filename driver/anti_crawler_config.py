@@ -122,147 +122,390 @@ class AntiCrawlerConfig:
             JavaScript 代码字符串
         """
         return """
-        // ========== 禁用 WebDriver 检测 ==========
+        // ============================================================
+        // Playwright 反检测增强脚本 - 针对主流检测网站优化
+        // ============================================================
+
+        // ========== 1. WebDriver 检测（关键！）==========
+        // 多层防护：删除属性 + 重定义 getter
+        delete Object.getPrototypeOf(navigator).webdriver;
         Object.defineProperty(navigator, 'webdriver', {
             get: () => undefined,
-            configurable: true
+            configurable: false,
+            enumerable: true
         });
         
-        // ========== 禁用 Chrome 自动化标志 ==========
+        // 防止通过原型链检测
+        const originalGetOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
+        Object.getOwnPropertyDescriptor = function(obj, prop) {
+            if (prop === 'webdriver') {
+                return undefined;
+            }
+            return originalGetOwnPropertyDescriptor.call(this, obj, prop);
+        };
+
+        // ========== 2. Navigator 属性完善 ==========
+        // plugins - 模拟真实 Chrome 浏览器
         Object.defineProperty(navigator, 'plugins', {
             get: () => {
                 const plugins = [
-                    { name: 'Chrome PDF Plugin', filename: 'internal-pdf-viewer' },
-                    { name: 'Chrome PDF Viewer', filename: 'mhjfbmdgcfjbbpaeojofohoefgiehjai' },
-                    { name: 'Native Client', filename: 'internal-nacl-plugin' }
+                    Object.create(Plugin.prototype, {
+                        name: { value: 'PDF Viewer', enumerable: true },
+                        description: { value: '', enumerable: true },
+                        filename: { value: 'internal-pdf-viewer', enumerable: true },
+                        length: { value: 1, enumerable: true },
+                        item: { value: (i) => i === 0 ? { type: 'application/pdf', suffixes: 'pdf', description: '' } : null },
+                        namedItem: { value: (name) => null }
+                    }),
+                    Object.create(Plugin.prototype, {
+                        name: { value: 'Chrome PDF Plugin', enumerable: true },
+                        description: { value: 'Portable Document Format', enumerable: true },
+                        filename: { value: 'internal-pdf-viewer', enumerable: true },
+                        length: { value: 1, enumerable: true },
+                        item: { value: (i) => i === 0 ? { type: 'application/x-google-chrome-pdf', suffixes: 'pdf', description: 'Portable Document Format' } : null },
+                        namedItem: { value: (name) => null }
+                    }),
+                    Object.create(Plugin.prototype, {
+                        name: { value: 'Chromium PDF Plugin', enumerable: true },
+                        description: { value: '', enumerable: true },
+                        filename: { value: 'internal-pdf-viewer', enumerable: true },
+                        length: { value: 1, enumerable: true },
+                        item: { value: (i) => i === 0 ? { type: 'application/pdf', suffixes: 'pdf', description: '' } : null },
+                        namedItem: { value: (name) => null }
+                    })
                 ];
+                plugins.length = 3;
                 plugins.item = (i) => plugins[i] || null;
                 plugins.namedItem = (name) => plugins.find(p => p.name === name) || null;
                 plugins.refresh = () => {};
                 return plugins;
+            },
+            configurable: false,
+            enumerable: true
+        });
+
+        // mimeTypes
+        Object.defineProperty(navigator, 'mimeTypes', {
+            get: () => {
+                const mimeTypes = [
+                    { type: 'application/pdf', suffixes: 'pdf', description: 'Portable Document Format', enabledPlugin: { name: 'PDF Viewer' } },
+                    { type: 'application/x-google-chrome-pdf', suffixes: 'pdf', description: 'Portable Document Format', enabledPlugin: { name: 'Chrome PDF Plugin' } }
+                ];
+                mimeTypes.length = 2;
+                mimeTypes.item = (i) => mimeTypes[i] || null;
+                mimeTypes.namedItem = (name) => mimeTypes.find(m => m.type === name) || null;
+                return mimeTypes;
+            },
+            configurable: false,
+            enumerable: true
+        });
+
+        // languages
+        Object.defineProperty(navigator, 'languages', {
+            get: () => ['zh-CN', 'zh', 'en-US', 'en'],
+            configurable: false,
+            enumerable: true
+        });
+
+        // platform
+        Object.defineProperty(navigator, 'platform', {
+            get: () => 'Win32',
+            configurable: false,
+            enumerable: true
+        });
+
+        // hardwareConcurrency
+        Object.defineProperty(navigator, 'hardwareConcurrency', {
+            get: () => 8,
+            configurable: false,
+            enumerable: true
+        });
+
+        // deviceMemory
+        Object.defineProperty(navigator, 'deviceMemory', {
+            get: () => 8,
+            configurable: false,
+            enumerable: true
+        });
+
+        // ========== 3. Chrome 对象检测 ==========
+        // 添加 window.chrome 对象（Sannysoft 重点检测）
+        if (!window.chrome) {
+            window.chrome = {
+                app: {
+                    isInstalled: false,
+                    InstallState: { DISABLED: 'disabled', INSTALLED: 'installed', NOT_INSTALLED: 'not_installed' },
+                    RunningState: { CANNOT_RUN: 'cannot_run', READY_TO_RUN: 'ready_to_run', RUNNING: 'running' }
+                },
+                runtime: {
+                    OnInstalledReason: { CHROME_UPDATE: 'chrome_update', INSTALL: 'install', SHARED_MODULE_UPDATE: 'shared_module_update', UPDATE: 'update' },
+                    OnRestartRequiredReason: { APP_UPDATE: 'app_update', OS_UPDATE: 'os_update', PERIODIC: 'periodic' },
+                    PlatformArch: { ARM: 'arm', ARM64: 'arm64', MIPS: 'mips', MIPS64: 'mips64', X86_32: 'x86-32', X86_64: 'x86-64' },
+                    PlatformNaclArch: { ARM: 'arm', MIPS: 'mips', MIPS64: 'mips64', X86_32: 'x86-32', X86_64: 'x86-64' },
+                    PlatformOs: { ANDROID: 'android', CROS: 'cros', LINUX: 'linux', MAC: 'mac', OPENBSD: 'openbsd', WIN: 'win' },
+                    RequestUpdateCheckStatus: { NO_UPDATE: 'no_update', THROTTLED: 'throttled', UPDATE_AVAILABLE: 'update_available' },
+                    connect: () => ({ onDisconnect: { addListener: () => {} }, onMessage: { addListener: () => {} }, postMessage: () => {} }),
+                    sendMessage: () => {}
+                },
+                csi: () => ({ onloadT: Date.now(), pageT: Date.now(), startE: Date.now(), tran: 15 }),
+                loadTimes: () => ({
+                    requestTime: Date.now() / 1000,
+                    startLoadTime: Date.now() / 1000,
+                    commitLoadTime: Date.now() / 1000,
+                    finishDocumentLoadTime: Date.now() / 1000,
+                    finishLoadTime: Date.now() / 1000,
+                    firstPaintTime: Date.now() / 1000,
+                    firstPaintAfterLoadTime: 0,
+                    navigationType: 'Other',
+                    wasFetchedViaSpdy: true,
+                    wasNpnNegotiated: true,
+                    npnNegotiatedProtocol: 'h2',
+                    wasAlternateProtocolAvailable: false,
+                    connectionInfo: 'h2'
+                })
+            };
+        }
+
+        // ========== 4. Permissions API 修复 ==========
+        const originalPermissionsQuery = navigator.permissions.query.bind(navigator.permissions);
+        navigator.permissions.query = (parameters) => {
+            if (parameters.name === 'notifications') {
+                return Promise.resolve({ state: Notification.permission, onchange: null });
+            }
+            if (parameters.name === 'geolocation') {
+                return Promise.resolve({ state: 'prompt', onchange: null });
+            }
+            if (parameters.name === 'camera' || parameters.name === 'microphone') {
+                return Promise.resolve({ state: 'prompt', onchange: null });
+            }
+            return originalPermissionsQuery(parameters);
+        };
+
+        // ========== 5. iframe contentWindow 检测修复 ==========
+        const originalContentWindow = Object.getOwnPropertyDescriptor(HTMLIFrameElement.prototype, 'contentWindow');
+        Object.defineProperty(HTMLIFrameElement.prototype, 'contentWindow', {
+            get: function() {
+                const window = originalContentWindow.get.call(this);
+                if (window) {
+                    try {
+                        Object.defineProperty(window.navigator, 'webdriver', { get: () => undefined });
+                    } catch (e) {}
+                }
+                return window;
             }
         });
-        
-        Object.defineProperty(navigator, 'languages', {
-            get: () => ['zh-CN', 'zh', 'en-US', 'en']
+
+        // ========== 6. window.external 检测 ==========
+        Object.defineProperty(window, 'external', {
+            get: () => ({
+                AddSearchProvider: () => {},
+                IsSearchProviderInstalled: () => 0,
+                addSearchEngine: () => {}
+            }),
+            configurable: false
         });
-        
-        // ========== 禁用 WebRTC（防止 IP 泄露）==========
+
+        // ========== 7. WebGL 指纹伪装 ==========
+        const getParameter = WebGLRenderingContext.prototype.getParameter;
+        WebGLRenderingContext.prototype.getParameter = function(parameter) {
+            // UNMASKED_VENDOR_WEBGL
+            if (parameter === 37445) return 'Google Inc. (NVIDIA)';
+            // UNMASKED_RENDERER_WEBGL
+            if (parameter === 37446) return 'ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 Direct3D11 vs_5_0 ps_5_0, D3D11)';
+            // MAX_TEXTURE_SIZE
+            if (parameter === 3379) return 16384;
+            // MAX_VERTEX_TEXTURE_IMAGE_UNITS
+            if (parameter === 35660) return 16;
+            return getParameter.apply(this, arguments);
+        };
+
+        if (typeof WebGL2RenderingContext !== 'undefined') {
+            const getParameter2 = WebGL2RenderingContext.prototype.getParameter;
+            WebGL2RenderingContext.prototype.getParameter = function(parameter) {
+                if (parameter === 37445) return 'Google Inc. (NVIDIA)';
+                if (parameter === 37446) return 'ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 Direct3D11 vs_5_0 ps_5_0, D3D11)';
+                if (parameter === 3379) return 16384;
+                if (parameter === 35660) return 16;
+                return getParameter2.apply(this, arguments);
+            };
+        }
+
+        // ========== 8. Canvas 指纹防护 ==========
+        const originalToDataURL = HTMLCanvasElement.prototype.toDataURL;
+        HTMLCanvasElement.prototype.toDataURL = function(type) {
+            // 添加细微噪声
+            const context = this.getContext('2d');
+            if (context && this.width > 0 && this.height > 0) {
+                try {
+                    const imageData = context.getImageData(0, 0, this.width, this.height);
+                    for (let i = 0; i < imageData.data.length; i += 4) {
+                        imageData.data[i] = imageData.data[i] ^ (Math.random() * 1.5);
+                    }
+                    context.putImageData(imageData, 0, 0);
+                } catch (e) {}
+            }
+            return originalToDataURL.apply(this, arguments);
+        };
+
+        // Canvas getImageData 伪装
+        const originalGetImageData = CanvasRenderingContext2D.prototype.getImageData;
+        CanvasRenderingContext2D.prototype.getImageData = function(x, y, w, h) {
+            const imageData = originalGetImageData.apply(this, arguments);
+            // 添加噪声
+            for (let i = 0; i < imageData.data.length; i += 4) {
+                imageData.data[i] = imageData.data[i] ^ (Math.random() * 1.5);
+            }
+            return imageData;
+        };
+
+        // ========== 9. AudioContext 指纹防护 ==========
+        const audioContext = window.AudioContext || window.webkitAudioContext;
+        if (audioContext) {
+            const originalCreateAnalyser = audioContext.prototype.createAnalyser;
+            audioContext.prototype.createAnalyser = function() {
+                const analyser = originalCreateAnalyser.apply(this, arguments);
+                const originalGetFloatFrequencyData = analyser.getFloatFrequencyData.bind(analyser);
+                analyser.getFloatFrequencyData = function(array) {
+                    originalGetFloatFrequencyData(array);
+                    for (let i = 0; i < array.length; i++) {
+                        array[i] += (Math.random() - 0.5) * 0.0001;
+                    }
+                };
+                return analyser;
+            };
+        }
+
+        // ========== 10. 字体指纹防护 ==========
+        const originalMeasureText = CanvasRenderingContext2D.prototype.measureText;
+        CanvasRenderingContext2D.prototype.measureText = function(text) {
+            const result = originalMeasureText.apply(this, arguments);
+            Object.defineProperty(result, 'width', {
+                get: () => originalMeasureText.apply(this, arguments).width + (Math.random() * 0.0001)
+            });
+            return result;
+        };
+
+        // ========== 11. WebRTC 禁用（防止 IP 泄露）==========
         if (window.RTCPeerConnection) {
             window.RTCPeerConnection = undefined;
         }
         if (window.webkitRTCPeerConnection) {
             window.webkitRTCPeerConnection = undefined;
         }
-        
-        // ========== 禁用 Canvas 指纹 ==========
-        const originalToDataURL = HTMLCanvasElement.prototype.toDataURL;
-        HTMLCanvasElement.prototype.toDataURL = function(type) {
-            if (type === 'image/png' && this.width === 220 && this.height === 30) {
-                // 检测到指纹采集，返回空白
-                return 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
-            }
-            // 添加随机噪声
-            const context = this.getContext('2d');
-            if (context) {
-                const imageData = context.getImageData(0, 0, this.width, this.height);
-                for (let i = 0; i < imageData.data.length; i += 4) {
-                    imageData.data[i] ^= (Math.random() * 2) | 0;
-                }
-                context.putImageData(imageData, 0, 0);
-            }
-            return originalToDataURL.apply(this, arguments);
-        };
-        
-        // ========== 禁用 AudioContext 指纹 ==========
-        const audioContext = window.AudioContext || window.webkitAudioContext;
-        if (audioContext) {
-            const originalCreateAnalyser = audioContext.prototype.createAnalyser;
-            audioContext.prototype.createAnalyser = function() {
-                const analyser = originalCreateAnalyser.apply(this, arguments);
-                const originalGetFloatFrequencyData = analyser.getFloatFrequencyData;
-                analyser.getFloatFrequencyData = function(array) {
-                    // 返回随机噪声而非真实音频指纹
-                    for (let i = 0; i < array.length; i++) {
-                        array[i] = -100 + Math.random() * 50;
-                    }
-                };
-                return analyser;
-            };
+        if (window.mozRTCPeerConnection) {
+            window.mozRTCPeerConnection = undefined;
         }
-        
-        // ========== 禁用 WebGL 指纹 ==========
-        const getParameter = WebGLRenderingContext.prototype.getParameter;
-        WebGLRenderingContext.prototype.getParameter = function(parameter) {
-            if (parameter === 37445) return 'Intel Inc.';  // UNMASKED_VENDOR_WEBGL
-            if (parameter === 37446) return 'Intel Iris OpenGL Engine';  // UNMASKED_RENDERER_WEBGL
-            return getParameter.apply(this, arguments);
-        };
-        
-        if (typeof WebGL2RenderingContext !== 'undefined') {
-            const getParameter2 = WebGL2RenderingContext.prototype.getParameter;
-            WebGL2RenderingContext.prototype.getParameter = function(parameter) {
-                if (parameter === 37445) return 'Intel Inc.';
-                if (parameter === 37446) return 'Intel Iris OpenGL Engine';
-                return getParameter2.apply(this, arguments);
-            };
-        }
-        
-        // ========== 禁用字体指纹 ==========
-        const originalMeasureText = CanvasRenderingContext2D.prototype.measureText;
-        CanvasRenderingContext2D.prototype.measureText = function(text) {
-            const result = originalMeasureText.apply(this, arguments);
-            // 添加微小随机偏移
-            result.width += Math.random() * 0.1 - 0.05;
-            return result;
-        };
-        
-        // ========== 修改 permissions API ==========
-        const originalQuery = window.navigator.permissions.query;
-        window.navigator.permissions.query = (parameters) => (
-            parameters.name === 'notifications' ?
-                Promise.resolve({ state: Notification.permission }) :
-                originalQuery(parameters)
-        );
-        
-        // ========== 禁用 Battery API ==========
+
+        // ========== 12. Battery API 伪装 ==========
         if (navigator.getBattery) {
+            const originalGetBattery = navigator.getBattery.bind(navigator);
             navigator.getBattery = () => Promise.resolve({
                 charging: true,
                 chargingTime: 0,
                 dischargingTime: Infinity,
-                level: 1
+                level: 1,
+                addEventListener: () => {},
+                removeEventListener: () => {},
+                dispatchEvent: () => true
             });
         }
-        
-        // ========== 禁用 Network Information API ==========
+
+        // ========== 13. Network Information API ==========
         if (navigator.connection) {
             Object.defineProperty(navigator, 'connection', {
                 get: () => ({
                     effectiveType: '4g',
                     downlink: 10,
                     rtt: 50,
-                    saveData: false
-                })
+                    saveData: false,
+                    type: 'wifi',
+                    addEventListener: () => {},
+                    removeEventListener: () => {},
+                    dispatchEvent: () => true
+                }),
+                configurable: false
             });
         }
+
+        // ========== 14. 自动化框架痕迹清除 ==========
+        const propsToDelete = [
+            '__playwright', '__puppeteer', '__selenium', '__webdriver_evaluate',
+            '__selenium_evaluate', '__fxdriver_evaluate', '__driver_unwrapped',
+            '__webdriver_unwrapped', '__selenium_unwrapped', '__fxdriver_unwrapped',
+            '__webdriver_script_function', '__webdriver_script_func', '__webdriver_script_fn',
+            '__nightmare', '__phantomas', '__bugzilla', '__driver_evaluate',
+            'cdc_adoQpoasnfa76pfcZLmcfl_Array', 'cdc_adoQpoasnfa76pfcZLmcfl_Promise',
+            'cdc_adoQpoasnfa76pfcZLmcfl_Symbol', 'cdc_adoQpoasnfa76pfcZLmcfl_JSON',
+            'cdc_adoQpoasnfa76pfcZLmcfl_Object', 'callPhantom', '_phantom',
+            '_phantomas', 'nightmare', 'domAutomation', 'domAutomationController'
+        ];
         
-        // ========== 隐藏自动化框架痕迹 ==========
-        delete window.__playwright;
-        delete window.__puppeteer;
-        delete window.__selenium;
-        delete window.__webdriver_evaluate;
-        delete window.__selenium_evaluate;
-        delete window.__fxdriver_evaluate;
-        delete window.__driver_unwrapped;
-        delete window.__webdriver_unwrapped;
-        delete window.__selenium_unwrapped;
-        delete window.__fxdriver_unwrapped;
-        delete window.cdc_adoQpoasnfa76pfcZLmcfl_Array;
-        delete window.cdc_adoQpoasnfa76pfcZLmcfl_Promise;
-        delete window.cdc_adoQpoasnfa76pfcZLmcfl_Symbol;
+        propsToDelete.forEach(prop => {
+            try {
+                delete window[prop];
+                delete document[prop];
+            } catch (e) {}
+        });
+
+        // ========== 15. Function.toString 检测防护 ==========
+        const oldToString = Function.prototype.toString;
+        Function.prototype.toString = function() {
+            if (this === navigator.permissions.query) {
+                return 'function query() { [native code] }';
+            }
+            return oldToString.call(this);
+        };
+
+        // ========== 16. Error 堆栈伪装 ==========
+        Error.stackTraceLimit = 10;
+        const originalErrorToString = Error.prototype.toString;
+        Error.prototype.toString = function() {
+            const stack = this.stack;
+            if (stack && stack.includes('playwright')) {
+                this.stack = stack.replace(/playwright/g, 'chrome');
+            }
+            return originalErrorToString.call(this);
+        };
+
+        // ========== 17. console 检测防护 ==========
+        const originalConsoleDebug = console.debug;
+        console.debug = function() {
+            if (arguments[0] && arguments[0].toString().includes('webdriver')) {
+                return;
+            }
+            return originalConsoleDebug.apply(console, arguments);
+        };
+
+        // ========== 18. timezone 伪装 ==========
+        const originalDateTimeFormat = Intl.DateTimeFormat;
+        Intl.DateTimeFormat = function(locale, options) {
+            if (options && options.timeZone) {
+                options.timeZone = 'Asia/Shanghai';
+            }
+            return new originalDateTimeFormat(locale, options);
+        };
+        Intl.DateTimeFormat.prototype = originalDateTimeFormat.prototype;
+
+        // ========== 19. screen 属性伪装 ==========
+        Object.defineProperty(screen, 'colorDepth', { get: () => 24 });
+        Object.defineProperty(screen, 'pixelDepth', { get: () => 24 });
         
-        console.log('[反检测] 用户特征保护已启用');
+        // ========== 20. Notification 权限伪装 ==========
+        if (window.Notification) {
+            Object.defineProperty(Notification, 'permission', {
+                get: () => 'default',
+                configurable: true
+            });
+        }
+
+        // ========== 21. 鼠标移动模拟 ==========
+        let mousePositions = [];
+        document.addEventListener('mousemove', (e) => {
+            mousePositions.push({ x: e.clientX, y: e.clientY, time: Date.now() });
+            if (mousePositions.length > 100) mousePositions.shift();
+        });
+
+        console.log('[反检测] 增强版用户特征保护已启用');
         """
     
     @staticmethod
