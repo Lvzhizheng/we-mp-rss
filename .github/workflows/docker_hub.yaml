@@ -1,5 +1,4 @@
 name: Publish Docker image to Docker Hub
-
 on:
   push:
      branches:
