@@ -437,15 +437,9 @@ async def switch_wechat_account(current_user: dict = Depends(get_current_user)):
     """
     try:
         # 调用切换账号方法
-        result = WX_API.switch_account()
-        
-        if result:
-            return success_response(None, "账号切换成功")
-        else:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=error_response(code=50001, message="切换账号失败")
-            )
+        from core.thread import ThreadManager
+        thread = ThreadManager(target=WX_API.switch_account,args=())  # 传入函数名
+        thread.start()  # 启动线程
     except HTTPException:
         raise
     except Exception as e:

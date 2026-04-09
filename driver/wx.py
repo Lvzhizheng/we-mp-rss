@@ -322,10 +322,12 @@ class Wx:
                 print_warning("未找到有效的token")
                 return None
             
-            # 创建新的控制器实例避免线程冲突
-            controller=self.controller
-            if not  controller.is_browser_started():
-                controller.start_browser()    
+            # 创建新的控制器实例避免线程冲突（greenlet 跨线程错误）
+            # 始终创建新实例，确保 driver 在当前线程中初始化
+            controller = PlaywrightController()
+            # 保存到临时变量，让 Call_Success 和 _extract_wechat_data 能使用
+            self._temp_controller = controller
+            controller.start_browser()    
             controller.open_url(f"{self.WX_HOME}?t=home/index&lang=zh_CN&token={token}")
             
             cookie = Store.load()
@@ -362,10 +364,14 @@ class Wx:
             print_error(f"Token操作失败: {str(e)}")
             return None
         finally:
-            # 不在这里清理，让Call_Success处理清理
+            # 清理当前线程创建的 controller
             if isClose:
-                self.controller.cleanup()
-            pass
+                try:
+                    controller.cleanup()
+                except Exception:
+                    pass
+            # 清理临时控制器引用
+            self._temp_controller = None
     def isLock(self):             
         if self.isLock:
             if os.path.exists(self.wx_login_url):
@@ -488,7 +494,9 @@ class Wx:
             }
     def Call_Success(self,has_extdata=True):
         """处理登录成功后的回调逻辑"""
-        if not hasattr(self, 'controller') or self.controller is None:
+        # 优先使用临时控制器（用于多线程场景），其次使用默认控制器
+        controller = getattr(self, '_temp_controller', None) or self.controller
+        if controller is None:
             print_error("浏览器控制器未初始化")
             return None
             
@@ -496,7 +504,7 @@ class Wx:
         token = self.extract_token_from_requests()
 
         # 获取当前所有cookie
-        cookies = self.controller.get_cookies()
+        cookies = controller.get_cookies()
         # print("\n获取到的Cookie:")
         self.SESSION=self.format_token(cookies,str(token))
         with self._login_lock:
