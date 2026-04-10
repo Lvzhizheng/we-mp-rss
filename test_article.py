@@ -99,6 +99,17 @@ def test_Gather_Article():
         ]
     for url in urls:
         content= ga.content_extract(url)
+        content=f'''
+        <!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>测试文章</title>
+</head>
+<body>{content}</body>
+</html>
+        '''
         with open("./static/test.html", "w", encoding="utf-8") as f:
             f.write(content)
         text_fix()

@@ -34,84 +34,194 @@ class WXArticleFetcher:
     async def get_article_content(self, url: str) -> Dict:
         """
         获取文章内容(异步)
-        
+
         Args:
             url: 文章URL
-            
+
         Returns:
-            文章信息字典
+            文章信息字典，包含:
+            - id: 文章ID
+            - title: 标题
+            - author: 作者
+            - description: 描述
+            - topic_image: 题图
+            - publish_time: 发布时间戳
+            - content: 正文HTML
+            - mp_info: 公众号信息 {mp_name, logo, biz}
+            - mp_id: 公众号ID
+            - fetch_error: 错误信息
         """
+        info = {
+            "id": self.extract_id_from_url(url),
+            "title": "",
+            "author": "",
+            "description": "",
+            "topic_image": "",
+            "publish_time": 0,
+            "content": "",
+            "mp_info": {
+                "mp_name": "",
+                "logo": "",
+                "biz": ""
+            },
+            "mp_id": "",
+            "fetch_error": ""
+        }
+
         try:
             # 使用异步上下文管理器
             async with PlaywrightController(
                 proxy_url=self.browser_proxy_url,
                 mobile_mode=True
             ) as controller:
-                
+
                 # 打开URL
                 success = await controller.open_url(url, timeout=self.wait_timeout)
                 if not success:
                     raise Exception("页面加载失败")
-                    
+
                 page = controller.page
-                
+
                 # 等待页面加载
                 await asyncio.sleep(2)
-                
+
                 # 获取页面内容
                 body = await page.content()
-                
-                # 检查是否被删除
-                if "该内容已被发布者删除" in body:
-                    raise Exception("违规无法查看")
-                    
-                # 处理"轻触阅读原文"按钮
-                # if "轻触阅读原文" in body:
-                #     try:
-                #         button = page.locator('text=轻触阅读原文')
-                #         button_count = await button.count()
-                #         if button_count > 0:
-                #             await button.first.wait_for(state="visible", timeout=1000)
-                #             await button.first.click()
-                #             await asyncio.sleep(2)
-                #     except Exception as e:
-                #         print_warning(f"阅读原文按钮处理失败: {str(e)}")
-                        
-                # 获取文章信息
+                body_text = await page.locator("body").text_content()
+
+                # 检查各种异常情况
+                if "当前环境异常，完成验证后即可继续访问" in body_text:
+                    info["content"] = ""
+                    info["fetch_error"] = "当前环境异常，完成验证后即可继续访问"
+                    return info
+
+                if "该内容已被发布者删除" in body_text or "The content has been deleted by the author." in body_text:
+                    info["content"] = "DELETED"
+                    info["fetch_error"] = "该内容已被发布者删除"
+                    return info
+
+                if "内容审核中" in body_text:
+                    info["content"] = "DELETED"
+                    info["fetch_error"] = "内容审核中"
+                    return info
+
+                if "该内容暂时无法查看" in body_text:
+                    info["content"] = "DELETED"
+                    info["fetch_error"] = "该内容暂时无法查看"
+                    return info
+
+                if "违规无法查看" in body_text or "Unable to view this content because it violates regulation" in body_text:
+                    info["content"] = "DELETED"
+                    info["fetch_error"] = "违规无法查看"
+                    return info
+
+                if "发送失败无法查看" in body_text:
+                    info["content"] = "DELETED"
+                    info["fetch_error"] = "发送失败无法查看"
+                    return info
+
+                # 获取文章基本信息
                 title = await page.locator('meta[property="og:title"]').get_attribute("content")
                 author = await page.locator('meta[property="og:article:author"]').get_attribute("content")
                 description = await page.locator('meta[property="og:description"]').get_attribute("content")
                 topic_image = await page.locator('meta[property="twitter:image"]').get_attribute("content")
-                
+
                 if not title:
                     title = await page.evaluate('() => document.title')
-                    
+
                 # 获取发布时间
                 publish_time = await self._extract_publish_time(page)
-                
+
                 # 获取内容
-                content = await page.locator('#page-content').inner_html()
-                
-                # 提取 biz
-                biz = self._extract_biz(url, content)
-                
-                # 构建结果
-                info = {
-                    "title": title or "",
-                    "author": author or "",
-                    "description": description or "",
-                    "topic_image": topic_image or "",
-                    "publish_time": publish_time,
-                    "content": content,
-                    "biz": biz,
-                    "url": url
-                }
-                
+                content = await page.locator('#js_content').inner_html()
+                if not content:
+                    content = await page.locator('#js_article').inner_html()
+
+                # 更新基本信息
+                info["title"] = title or ""
+                info["author"] = author or ""
+                info["description"] = description or ""
+                info["topic_image"] = topic_image or ""
+                info["publish_time"] = publish_time
+                info["content"] = content or ""
+
+                # 获取公众号信息
+                try:
+                    # 获取公众号头像
+                    logo_src = None
+                    selectors = [
+                        '#js_like_profile_bar .wx_follow_avatar img',
+                        '#js_like_profile_bar img.wx_follow_avatar_pic',
+                        '.wx_follow_avatar img'
+                    ]
+
+                    for selector in selectors:
+                        try:
+                            ele_logo = page.locator(selector)
+                            logo_src = await ele_logo.get_attribute('src', timeout=5000)
+                            if logo_src:
+                                print_success(f"使用选择器 {selector} 成功获取公众号头像")
+                                break
+                        except Exception:
+                            continue
+
+                    if not logo_src:
+                        try:
+                            logo_src = await page.locator('meta[property="og:image"]').get_attribute("content", timeout=3000)
+                        except Exception:
+                            pass
+
+                    # 获取公众号名称
+                    mp_name = None
+                    try:
+                        mp_name = await page.evaluate('() => { const el = document.getElementById("js_wx_follow_nickname"); return el ? el.textContent : null; }')
+                    except Exception:
+                        pass
+
+                    if not mp_name:
+                        try:
+                            mp_name = await page.locator('meta[property="og:article:author"]').get_attribute("content", timeout=3000)
+                        except Exception:
+                            pass
+
+                    # 获取biz
+                    biz = None
+                    try:
+                        biz = await page.evaluate('() => window.biz')
+                    except Exception:
+                        pass
+
+                    if not biz:
+                        biz = self._extract_biz(url, content or "")
+
+                    info["mp_info"] = {
+                        "mp_name": mp_name or "未知公众号",
+                        "logo": logo_src or "",
+                        "biz": biz or ""
+                    }
+
+                    # 生成 mp_id
+                    if biz:
+                        try:
+                            info["mp_id"] = "MP_WXS_" + base64.b64decode(biz).decode("utf-8")
+                        except Exception:
+                            info["mp_id"] = ""
+
+                except Exception as e:
+                    print_error(f"获取公众号信息失败: {str(e)}")
+                    info["mp_info"] = {
+                        "mp_name": "未知公众号",
+                        "logo": "",
+                        "biz": ""
+                    }
+                    info["mp_id"] = ""
+
                 return info
-                
+
         except Exception as e:
+            info["fetch_error"] = str(e)
             print_error(f"获取文章内容失败: {str(e)}")
-            raise
+            return info
             
     async def _extract_publish_time(self, page) -> int:
         """
@@ -206,6 +316,64 @@ class WXArticleFetcher:
             return match.group(1)
             
         return ""
+
+    def extract_id_from_url(self, url: str) -> str:
+        """从微信文章URL中提取ID
+        
+        Args:
+            url: 文章URL
+            
+        Returns:
+            文章ID字符串，如果提取失败返回空字符串
+        """
+        try:
+            # 从URL中提取ID部分
+            match = re.search(r'/s/([A-Za-z0-9_-]+)', url)
+            if not match:
+                return ""
+                
+            id_str = match.group(1)
+            
+            # 添加必要的填充
+            padding = 4 - len(id_str) % 4
+            if padding != 4:
+                id_str += '=' * padding
+                
+            # 尝试解码base64
+            try:
+                id_number = base64.b64decode(id_str).decode("utf-8")
+                return id_number
+            except Exception:
+                # 如果base64解码失败，返回原始ID字符串
+                return match.group(1)
+                
+        except Exception as e:
+            print_error(f"提取文章ID失败: {e}")
+            return ""
+
+    @staticmethod
+    def get_description(content: str, length: int = 200) -> str:
+        """
+        从文章内容中提取描述文本
+        
+        Args:
+            content: HTML 内容
+            length: 描述文本的最大长度
+            
+        Returns:
+            描述文本
+        """
+        if not content:
+            return ""
+        try:
+            soup = BeautifulSoup(content, 'html.parser')
+            js_content_div = soup
+            if js_content_div is None:
+                return ""
+            text = js_content_div.get_text().strip().strip("\n").replace("\n", " ").replace("\r", " ")
+            return text[:length] + "..." if len(text) > length else text
+        except Exception:
+            return ""
 
 
 # Web 工具类(兼容旧代码)
