@@ -2,7 +2,6 @@
 Async Playwright Controller - 完全异步版本
 彻底解决 asyncio 兼容性问题
 """
-from nt import environ
 import os
 import sys
 import json
@@ -63,7 +62,7 @@ class PlaywrightController:
             debug: 调试模式
             mobile_mode: 是否为移动端模式
         """
-        self.headless = environ.get("HEADLESS", "false").lower() == "true" if headless is None else headless
+        self.headless = os.environ.get("HEADLESS", "false").lower() == "true" if headless is None else headless
         self.browser_type = browser_type
         self.proxy_url = proxy_url
         self.debug = debug
