@@ -345,7 +345,58 @@ class Web:
 
         except Exception as e:
             print_error(f"提取图片URL失败: {e}")
-            return ""
+            return content
+
+    @staticmethod
+    def proxy_images(content: str) -> str:
+        """
+        处理文章内容中的图片链接，将微信图片转换为代理URL
+        
+        微信公众号文章图片特点：
+        1. 使用 data-src 属性（懒加载）
+        2. URL 来自 mmbiz.qpic.cn 等微信 CDN
+        3. 可能需要正确的 referer 才能访问
+        
+        Args:
+            content: HTML 内容
+            
+        Returns:
+            处理后的 HTML 内容
+        """
+        if not content:
+            return content
+            
+        try:
+            soup = BeautifulSoup(content, 'html.parser')
+            
+            # 处理所有图片标签
+            for img in soup.find_all('img'):
+                # 获取图片URL（优先 data-src，其次 src）
+                img_url = img.get('data-src') or img.get('src')
+                
+                if img_url and img_url.startswith(('http://', 'https://')):
+                    # 将图片URL转换为代理URL
+                    from urllib.parse import quote
+                    encoded_url = quote(img_url, safe='')
+                    proxy_url = f"/static/res/logo/{encoded_url}"
+                    
+                    # 设置 src 属性（确保图片能显示）
+                    img['src'] = proxy_url
+                    
+                    # 如果有 data-src，也更新它
+                    if img.has_attr('data-src'):
+                        img['data-src'] = proxy_url
+                    
+                    # 移除可能阻止图片加载的属性
+                    for attr in ['data-type', 'data-ratio', 'data-w']:
+                        if img.has_attr(attr):
+                            del img[attr]
+            
+            return str(soup)
+            
+        except Exception as e:
+            print_error(f"处理图片代理失败: {e}")
+            return content
 
 
 # 导入 asyncio(用于文件顶部)

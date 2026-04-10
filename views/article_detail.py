@@ -81,18 +81,22 @@ async def article_detail_view(
             related_list.append(rel_data)
         
         # 处理文章数据
+        # 处理文章内容中的图片链接
+        raw_content = article.content_html or ""
+        processed_content = process_content_images(raw_content)
+        
         article_data = {
             "id": article.id,
             "title": article.title,
             "description": article.description or Web.get_description(article.content),
-            "pic_url": Web.get_image_url(article.pic_url),
+            "pic_url": article.pic_url,
             "url": article.url,
             "publish_time": datetime.fromtimestamp(article.publish_time).strftime('%Y-%m-%d %H:%M') if article.publish_time else "",
             "created_at": article.created_at.strftime('%Y-%m-%d %H:%M') if article.created_at else "",
-            "content": (article.content or article.content_html or ""),
+            "content": processed_content,
             "mp_name": feed.mp_name if feed else "未知公众号",
             "mp_id": article.mp_id,
-            "mp_cover": Web.get_image_url(feed.mp_cover) if feed else "",
+            "mp_cover": feed.mp_cover if feed else "",
             "mp_intro": feed.mp_intro if feed else "",
         }
         
