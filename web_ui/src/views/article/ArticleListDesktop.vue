@@ -41,30 +41,50 @@
             </div>
             <a-list :data="mpList" :loading="mpLoading" bordered>
               <template #item="{ item, index }">
-                <a-list-item @click="handleMpClick(item.id)" :class="{ 'active-mp': activeMpId === item.id }"
-                  style="padding: 9px 8px; cursor: pointer; display: flex; align-items: center; justify-content: space-between;">
-                  <div style="display: flex; align-items: center;">
-                    <img :src="Avatar(item.avatar)" width="40" style="float:left;margin-right:1rem;" />
-                    <a-typography-text strong style="line-height:32px;" :style="{ opacity: item.status === 0 ? 0.5 : 1 }">
-                      {{ (item.name || item.mp_name).length > 8 ? (item.name || item.mp_name).substring(0, 8) + '...' : (item.name || item.mp_name) }}
-                    </a-typography-text>
-                    <a-button v-if="activeMpId === item.id && canManageMp(item.id)" size="mini" type="text" status="danger"
-                      @click="$event.stopPropagation(); deleteMp(item.id)">
-                      <template #icon><icon-delete /></template>
-                    </a-button>
-                    <a-button v-if="activeMpId === item.id && canManageMp(item.id)" size="mini" type="text"
-                      @click="$event.stopPropagation(); copyMpId(item.id)">
-                      <template #icon><icon-copy /></template>
-                    </a-button>
-                    <a-button v-if="activeMpId === item.id && canManageMp(item.id)" size="mini" type="text"
-                      @click="$event.stopPropagation(); toggleMpStatus(item.id, item.status === 1 ? 0 : 1)">
-                      <template #icon>
-                        <icon-stop v-if="item.status === 1" />
-                        <icon-play-arrow v-else />
-                      </template>
-                    </a-button>
-                  </div>
-                </a-list-item>
+                <a-popover trigger="hover" position="right" :content-style="{ padding: '12px', minWidth: '200px' }">
+                  <a-list-item @click="handleMpClick(item.id)" :class="{ 'active-mp': activeMpId === item.id }"
+                    style="padding: 9px 8px; cursor: pointer; display: flex; align-items: center; justify-content: space-between;">
+                    <div style="display: flex; align-items: center;">
+                      <img :src="Avatar(item.avatar)" width="40" style="float:left;margin-right:1rem;" />
+                      <a-typography-text strong style="line-height:32px;" :style="{ opacity: item.status === 0 ? 0.5 : 1 }">
+                        {{ (item.name || item.mp_name).length > 8 ? (item.name || item.mp_name).substring(0, 8) + '...' : (item.name || item.mp_name) }}
+                      </a-typography-text>
+                      <a-button v-if="activeMpId === item.id && canManageMp(item.id)" size="mini" type="text" status="danger"
+                        @click="$event.stopPropagation(); deleteMp(item.id)">
+                        <template #icon><icon-delete /></template>
+                      </a-button>
+                      <a-button v-if="activeMpId === item.id && canManageMp(item.id)" size="mini" type="text"
+                        @click="$event.stopPropagation(); copyMpId(item.id)">
+                        <template #icon><icon-copy /></template>
+                      </a-button>
+                      <a-button v-if="activeMpId === item.id && canManageMp(item.id)" size="mini" type="text"
+                        @click="$event.stopPropagation(); toggleMpStatus(item.id, item.status === 1 ? 0 : 1)">
+                        <template #icon>
+                          <icon-stop v-if="item.status === 1" />
+                          <icon-play-arrow v-else />
+                        </template>
+                      </a-button>
+                    </div>
+                  </a-list-item>
+                  <template #content>
+                    <div style="display: flex; flex-direction: column; gap: 8px;">
+                      <div style="display: flex; align-items: center; gap: 8px;">
+                        <img :src="Avatar(item.avatar)" width="32" style="border-radius: 4px;" />
+                        <div>
+                          <div style="font-weight: 600; font-size: 14px;">{{ item.name || item.mp_name }}</div>
+                          <div style="font-size: 12px; color: var(--color-text-3);">ID: {{ item.id }}</div>
+                        </div>
+                      </div>
+                      <div v-if="item.mp_intro" style="font-size: 12px; color: var(--color-text-2); line-height: 1.5;">
+                        {{ item.mp_intro }}
+                      </div>
+                      <div style="display: flex; gap: 12px; font-size: 12px; color: var(--color-text-3);">
+                        <span>文章数: {{ item.article_count || 0 }}</span>
+                        <span>状态: {{ item.status === 1 ? '启用' : '停用' }}</span>
+                      </div>
+                    </div>
+                  </template>
+                </a-popover>
               </template>
             </a-list>
             <a-pagination :total="mpPagination.total" simple @change="handleMpPageChange" :show-total="true"
@@ -1228,7 +1248,7 @@ const fetchMpList = async () => {
 
     // 选择"全部"时，请求少2条（因为会添加"全部"选项，后端也会添加"精选文章"）
     const adjustedPageSize = mpFilterType.value === 'all' && !mpSearchText.value
-      ? mpPagination.value.pageSize - 1
+      ? mpPagination.value.pageSize
       : mpPagination.value.pageSize
 
     const res = await getSubscriptions({
