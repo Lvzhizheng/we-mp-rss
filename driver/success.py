@@ -58,7 +58,8 @@ def getStatus():
                     # 检查过期时间戳
                     elif 'expiry_timestamp' in expiry:
                         expiry_timestamp = expiry['expiry_timestamp']
-                        if expiry_timestamp and expiry_timestamp <= time.time():
+                        # 过期时间戳 >= 当前时间，说明还没过期
+                        if expiry_timestamp and expiry_timestamp >= time.time():
                             return True
                         else:
                             # token已过期，更新状态
