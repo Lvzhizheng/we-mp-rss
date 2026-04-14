@@ -536,7 +536,10 @@ def test_anti_bot_quick():
 def switchaccount():
     import asyncio
     from driver.base import WX_API
-    asyncio.run(WX_API.switch_account())
+    if not asyncio.run(WX_API.switch_account()):
+        from jobs.failauth import send_wx_code
+        import threading
+        threading.Thread(target=send_wx_code,args=(f"公众号平台登录失效,请重新登录",)).start()
     input("按回车键退出")
     pass
 if __name__=="__main__":
