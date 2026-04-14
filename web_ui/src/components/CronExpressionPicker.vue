@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { Message } from '@arco-design/web-vue'
 
 const props = defineProps({
@@ -19,7 +19,18 @@ const weekdays = ref('*')
 
 // 手动输入模式
 const manualInputMode = ref(false)
-const manualExpression = ref('')
+
+// 表单模型（用于解决 a-form 的 model 警告）
+const formModel = ref({
+  manualExpression: ''
+})
+
+// 初始化时解析传入的表达式
+onMounted(() => {
+  if (props.modelValue) {
+    parseExpression(props.modelValue)
+  }
+})
 
 const parseCronDescription = (part: string, type: string) => {
   if (part === '*') return `每${type}`
@@ -79,6 +90,8 @@ const cornDescription = computed(() => {
 
 const updateExpression = () => {
   emit('update:modelValue', cronExpression.value)
+  // 同步更新手动输入值
+  formModel.value.manualExpression = cronExpression.value
 }
 
 const parseExpression = (expr: string) => {
@@ -89,6 +102,8 @@ const parseExpression = (expr: string) => {
     days.value = parts[2]
     months.value = parts[3]
     weekdays.value = parts[4]
+    // 同步更新手动输入值
+    formModel.value.manualExpression = expr
   }
 }
 
@@ -133,9 +148,9 @@ const validateCronExpression = (expr: string): boolean => {
 
 // 应用手动输入的表达式
 const applyManualExpression = () => {
-  if (validateCronExpression(manualExpression.value)) {
-    parseExpression(manualExpression.value)
-    emit('update:modelValue', manualExpression.value)
+  if (validateCronExpression(formModel.value.manualExpression)) {
+    parseExpression(formModel.value.manualExpression)
+    emit('update:modelValue', formModel.value.manualExpression)
     Message.success('表达式已应用')
   }
 }
@@ -144,14 +159,40 @@ const applyManualExpression = () => {
 const toggleInputMode = () => {
   manualInputMode.value = !manualInputMode.value
   if (manualInputMode.value) {
-    manualExpression.value = cronExpression.value
+    // 切换到手动模式时，将当前选择器的值同步到手动输入框
+    formModel.value.manualExpression = cronExpression.value
+  } else {
+    // 切换到选择器模式时，解析手动输入的值并更新选择器
+    if (formModel.value.manualExpression) {
+      parseExpression(formModel.value.manualExpression)
+    }
   }
 }
 
+// 监听 modelValue 变化，同步更新手动输入值
+watch(() => props.modelValue, (newVal) => {
+  if (newVal) {
+    // 无论在哪个模式，都要同步更新手动输入值
+    formModel.value.manualExpression = newVal
+    // 如果不在手动模式，也要解析表达式更新选择器
+    if (!manualInputMode.value) {
+      parseExpression(newVal)
+    }
+  }
+})
+
 // 监听手动输入变化，实时预览
-watch(manualExpression, (newVal) => {
-  if (manualInputMode.value && validateCronExpression(newVal)) {
-    parseExpression(newVal)
+watch(() => formModel.value.manualExpression, (newVal) => {
+  if (manualInputMode.value && newVal && validateCronExpression(newVal)) {
+    // 在手动模式下，实时解析并更新选择器的值（但不触发emit，避免循环）
+    const parts = newVal.split(' ')
+    if (parts.length === 5) {
+      minutes.value = parts[0]
+      hours.value = parts[1]
+      days.value = parts[2]
+      months.value = parts[3]
+      weekdays.value = parts[4]
+    }
   }
 })
 
@@ -165,10 +206,10 @@ defineExpose({
 
     <!-- 手动输入模式 -->
     <div v-if="manualInputMode" class="manual-input-section">
-      <a-form>
+      <a-form :model="formModel">
         <a-form-item label="Cron表达式">
           <a-input 
-            v-model="manualExpression" 
+            v-model="formModel.manualExpression" 
             placeholder="例如: 0 12 * * * (每天中午12点)"
             @press-enter="applyManualExpression"
           />
@@ -182,7 +223,7 @@ defineExpose({
     </div>
 
     <!-- 选择器模式 -->
-    <a-form v-if="!manualInputMode">
+    <a-form v-if="!manualInputMode" :model="formModel">
       <a-form-item label="分钟">
         <a-select v-model="minutes" @change="updateExpression" style="width: 180px">
           <a-option v-for="m in 60" :key="m-1" :value="(m-1).toString()">{{ m-1 }}</a-option>

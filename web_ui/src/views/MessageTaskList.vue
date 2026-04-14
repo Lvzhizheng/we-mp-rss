@@ -133,7 +133,7 @@ const handleAdd = () => {
 const FreshJob = () => {
   FreshJobApi().then((data) => {
     console.log("刷新任务")
-    Message.success(data.message||"刷新任务成功")
+    Message.success(data.data?.message || "刷新任务成功")
   })
 }
 
