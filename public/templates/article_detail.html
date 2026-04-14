@@ -2,14 +2,8 @@
 {% include "includes/article_detail_styles.html" %}
 <!-- 文章头部信息 -->
 <div class="article-header">
-    <h1 style="margin-bottom: 1rem;font-weight: bold;font-size: 1.8rem;">{{article.title}}</h1>
-    {% if article.pic_url %}
-    <div style="margin-bottom: 1.5rem; text-align: center;">
-        <img src="{{article.pic_url}}" alt="{{article.title}}" style="width: 200px; max-height: 200px; object-fit: cover; border-radius: 8px;"/>
-    </div>
-    {% endif %}
+    <h1 style="margin-bottom: 1rem;font-weight: bold;font-size: 1.2rem;">{{article.title}}</h1>
     
-   
     <div class="article-meta">
         <div>
             <span style="margin-right: 1rem;">🕐 发布时间: {{article.publish_time}}</span>
@@ -20,12 +14,22 @@
     </p>
         </div>
     </div>
+
+  
+   
     
     {% if article.description %}
-    <div style="background: #f8f9fa; padding: 1rem; border-radius: 4px; border-left: 4px solid #667eea; margin-bottom: 1rem;">
+    <div style="background: #f8f9fa;margin-top: 1rem; padding: 1rem; border-radius: 4px; margin-bottom: 1rem;">
         <strong>摘要：</strong> {{article.description}}
     </div>
     {% endif %}
+
+    {% if article.pic_url %}
+    <div style="margin-bottom: 1.5rem; text-align: center;">
+        <img src="{{article.pic_url}}" alt="{{article.title}}" style="aspect-ratio:16/9; width: 90%;object-fit: cover;object-position: center;  border-radius: 8px;"/>
+    </div>
+    {% endif %}
+    
   
     <!-- 公众号信息 -->
     <div class="mp-info">
