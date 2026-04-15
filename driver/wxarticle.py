@@ -603,29 +603,10 @@ class Web:
                 section_tags = js_content_div.find_all('section')
                 for section in section_tags:
                     section['powered-by'] = 'werss'
-                result=Web.replace_section_with_div(js_content_div.prettify())
-                return  result
+                return  js_content_div.prettify()
             except Exception as e:
                 print_error(f"修复图片失败: {str(e)}")
             return content
-    @staticmethod
-    def replace_section_with_div(html_content: str, tag: str = "fragment"):
-        # 正则解释：
-        # <section       : 匹配 <section
-        # (?:\s[^>]*)?   : 非捕获组，匹配属性（空格+非>字符），?表示属性是可选的
-        # >              : 匹配闭合的尖括号
-        # flags=re.IGNORECASE : 忽略大小写，匹配 <SECTION> 或 <Section>
-        
-        # 替换开标签
-        # 使用 \1 保留原本标签内的属性（如 class="..."）
-        pattern_open = re.compile(r'<section(?:\s[^>]*)?>', re.IGNORECASE)
-        html_content = pattern_open.sub(f'<{tag}>', html_content)
-        
-        # 替换闭标签
-        pattern_close = re.compile(r'</section>', re.IGNORECASE)
-        html_content = pattern_close.sub('</{tag}>', html_content)
-        return html_content
-    @staticmethod
     def clean_article_content(html_content: str,mp_id:str=""):
         from tools.htmltools import htmltools
         html_content=Web.fix_images(html_content)
