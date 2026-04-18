@@ -10,14 +10,14 @@ from core.print import print_warning,print_info,print_error,print_success
 # Base = declarative_base()
 
 class Db:
-    connection_str: str=None
+    connection_str: str=""
     def __init__(self,tag:str="默认",User_In_Thread=True):
         self.Session= None
         self.engine = None
         self.User_In_Thread=User_In_Thread
         self.tag=tag
         print_success(f"[{tag}]连接初始化")
-        self.init(cfg.get("db"))
+        self.init(cfg.get("db","")) # type: ignore
     def get_engine(self) -> Engine:
         """Return the SQLAlchemy engine for this database connection."""
         if self.engine is None:
@@ -73,10 +73,10 @@ class Db:
         """Ensure required columns exist for legacy articles tables."""
         try:
             inspector = inspect(self.engine)
-            if "articles" not in inspector.get_table_names():
+            if "articles" not in inspector.get_table_names(): # type: ignore
                 return
 
-            columns = {column["name"] for column in inspector.get_columns("articles")}
+            columns = {column["name"] for column in inspector.get_columns("articles")} # type: ignore
             alter_statements = []
             if "is_favorite" not in columns:
                 alter_statements.append("ALTER TABLE articles ADD COLUMN is_favorite INTEGER DEFAULT 0")
@@ -143,6 +143,7 @@ class Db:
                 if existing_article is not None:
                     # 当更新时间和状态都相同时，不需要更新
                     if art.status == existing_article.status and existing_article.publish_time==art.publish_time \
+                    and art.status!=Article.STATUS_DELETED \
                     and art.title==existing_article.title: # type: ignore
                         return False
                     if art.content_html:# type: ignore
@@ -199,7 +200,7 @@ class Db:
             return self.get_session().query(Feed).all()
         except Exception as e:
             print(f"Failed to fetch Feed: {e}")
-            return e
+            return e # type: ignore
             
     def get_mps_list(self, mp_ids:str) -> List[Feed]:
         try:
