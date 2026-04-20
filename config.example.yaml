@@ -18,7 +18,10 @@ server:
    auth_web: ${WERSS_AUTH_WEB:-False}
    #是否发送授权二维通知 默认True
    send_code: ${WERSS_SEND_CODE:-True}
-
+   #是否启用自动刷新文章统计 默认False
+   article_stats_refresh_enabled: ${ARTICLE_STATS_REFRESH_ENABLED:-False}
+   # 文章统计刷新间隔 默认300秒
+   article_stats_refresh_interval: ${ARTICLE_STATS_REFRESH_INTERVAL:-3600}
 
 #数据库连接 例如db:  mysql+pymysql://<username>:<password>@<host>/we-rss?charset=utf8mb4
 #PostgreSQL 连接示例: postgresql://<username>:<password>@<host>/<database>

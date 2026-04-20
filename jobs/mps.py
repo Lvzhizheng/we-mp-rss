@@ -288,7 +288,7 @@ def start_article_stats_refresh():
     from core.config import cfg
     
     # 获取刷新间隔,默认5分钟
-    refresh_interval = int(cfg.get("article_stats_refresh_interval", 300))
+    refresh_interval = int(cfg.get("server.article_stats_refresh_interval", 3600))
     
     # 添加定时任务,每隔指定时间刷新一次文章统计
     scheduler.add_cron_job(

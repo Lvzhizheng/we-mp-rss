@@ -77,7 +77,7 @@ if __name__ == '__main__':
         print_warning("未开启自动修正文章任务")
     
     # 启动文章统计定时刷新任务
-    if cfg.get("article_stats_refresh_enabled", True):  # 默认启用
+    if cfg.get("server.article_stats_refresh_enabled", False):  # 默认关闭
         from jobs.mps import start_article_stats_refresh
         start_article_stats_refresh()
     else:

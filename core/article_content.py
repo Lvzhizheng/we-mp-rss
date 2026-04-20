@@ -115,10 +115,20 @@ def sync_article_content(
         article.status = DATA_STATUS.ACTIVE
         if not (getattr(article, "description", "") or "").strip():
             article.description = Web.get_description(content)
+        # 修正成功,重置失败计数
+        if hasattr(article, 'fix_fail_count'):
+            article.fix_fail_count = 0
         session.commit()
         session.refresh(article)
         print_info(f"article {article.id} content synced via {mode}")
         return True, mode
     except Exception:
+        # 修正失败,增加失败计数
+        if hasattr(article, 'fix_fail_count'):
+            article.fix_fail_count = (article.fix_fail_count or 0) + 1
+            try:
+                session.commit()
+            except Exception:
+                session.rollback()
         session.rollback()
         raise

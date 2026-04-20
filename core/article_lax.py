@@ -1,6 +1,7 @@
 import threading
 from core import lax, thread
 from core.models import Article, Feed, DATA_STATUS
+from core.models.article import ArticleBase
 from core.db import DB
 from core.print import print_info, print_error
 from core.redis_client import RedisCache
@@ -29,7 +30,7 @@ def laxArticle():
     session = DB.get_session()
     try:
         # 获取没有内容的文章数量 - 同时检查 content 和 content_html 字段，排除已删除的文章
-        info.no_content_count = session.query(Article).filter(
+        info.no_content_count = session.query(ArticleBase).filter(
             ((Article.content == None) | (Article.content == '')) &
             ((Article.content_html == None) | (Article.content_html == '')) &
             (Article.status != DATA_STATUS.DELETED)
@@ -40,7 +41,7 @@ def laxArticle():
         info.has_content_count = info.all_count - info.no_content_count
 
         # 获取删除的文章 - 只查询status字段
-        info.wrong_count = session.query(Article).filter(Article.status != DATA_STATUS.ACTIVE).count()
+        info.wrong_count = session.query(ArticleBase).filter(Article.status != DATA_STATUS.ACTIVE).count()
 
         # 公众号总数 - 只查询id字段
         info.mp_all_count = session.query(Feed.id).distinct().count()
