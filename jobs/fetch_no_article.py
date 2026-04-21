@@ -15,7 +15,7 @@ def fetch_articles_without_content():
         # 查询content为空且未被锁定的文章
         from sqlalchemy import or_
         articles = session.query(Article).filter(
-            or_(Article.content.is_(None), Article.content == ""),
+            or_(Article.has_content==0),
             Article.status != DATA_STATUS.FETCHING,  # 排除正在获取的文章
             Article.status != DATA_STATUS.DELETED,  # 已删除文章不再参与自动补抓
             or_(Article.fix_fail_count.is_(None), Article.fix_fail_count < 3)  # 排除失败3次及以上的文章

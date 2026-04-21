@@ -36,6 +36,7 @@ class ArticleBase(Base):
     is_read = Column(Integer, default=0)  # 是否已读
     is_favorite = Column(Integer, default=0)  # 是否收藏
     fix_fail_count = Column(Integer, default=0)  # 修正内容失败次数
+    has_content = Column(Integer, default=0, index=True)  # 是否有正文内容（0=无，1=有），用于加速查询
 class Article(ArticleBase):
     content = Column(Text)
     content_html = Column(Text)
@@ -75,5 +76,6 @@ class Article(ArticleBase):
             'is_export': self.is_export,
             'is_read': self.is_read,
             'is_favorite': self.is_favorite,
-            'fix_fail_count': self.fix_fail_count
+            'fix_fail_count': self.fix_fail_count,
+            'has_content': self.has_content
         }

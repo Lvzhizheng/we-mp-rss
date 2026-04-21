@@ -57,6 +57,13 @@ class Db:
                                      connect_args=connect_args
                                      )
             
+            # 添加SQL执行事件监听器，打印执行的SQL语句
+            @event.listens_for(self.engine, "before_cursor_execute")
+            def receive_before_cursor_execute(conn, cursor, statement, parameters, context, executemany):
+                print_info(f"[SQL] {statement}")
+                if parameters:
+                    print_info(f"[参数] {parameters}")
+            
             # 为 SQLite 设置 text_factory 处理无效 UTF-8 字符
             if con_str.startswith('sqlite:///'):
                 @event.listens_for(self.engine, "connect")
@@ -80,6 +87,9 @@ class Db:
             alter_statements = []
             if "is_favorite" not in columns:
                 alter_statements.append("ALTER TABLE articles ADD COLUMN is_favorite INTEGER DEFAULT 0")
+
+            if "has_content" not in columns:
+                alter_statements.append("ALTER TABLE articles ADD COLUMN has_content INTEGER DEFAULT 0")
 
             if not alter_statements:
                 return
@@ -149,6 +159,8 @@ class Db:
                     if art.content_html:# type: ignore
                         from tools.fix import fix_html
                         art.content_html = fix_html(art.content_html) # type: ignore
+                    # 设置 has_content 字段
+                    art.has_content = 1 if (art.content and art.content.strip()) else 0 # type: ignore
                     session.merge(art)  # 使用 merge 来更新现有记录
                     session.commit()
                     print_warning(f"Article already exists: {art.id}")
@@ -173,7 +185,10 @@ class Db:
             if art.content_html is None:
                 from tools.fix import fix_html
                 art.content_html = fix_html(art.content) # type: ignore
-           
+
+            # 设置 has_content 字段
+            art.has_content = 1 if (art.content and art.content.strip()) else 0 # type: ignore
+
             session.add(art)
             print_info(f"Added article: {art.id}")
             sta=session.commit()

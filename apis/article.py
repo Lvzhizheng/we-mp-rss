@@ -97,6 +97,8 @@ async def _run_refresh_article_task(task_id: str, article_id: str):
             article.description = fetched.get("description") or article.description
         article.pic_url = fetched.get("topic_image") or fetched.get("pic_url") or article.pic_url
         article.status = DATA_STATUS.DELETED if fetched_content == "DELETED" else DATA_STATUS.ACTIVE
+        # 更新 has_content 字段
+        article.has_content = 1 if (article.content and article.content.strip()) else 0
 
         now_seconds = int(time.time())
         now_millis = int(time.time() * 1000)
@@ -437,7 +439,6 @@ async def get_articles(
 ):
     session = DB.get_session()
     try:
-        from sqlalchemy import case, func, or_
 
         # 状态字符串到状态码的映射
         status_map = {
@@ -450,14 +451,8 @@ async def get_articles(
             'failed': DATA_STATUS.FAILED,
         }
 
-        # 构建查询条件 - 使用 Article 模型（包含 content 字段）
-        query = session.query(
-            ArticleBase,
-            case(
-                ((Article.content.isnot(None)) & (Article.content != ''), 1),
-                else_=0
-            ).label('has_content')
-        )
+        # 构建查询条件 - 使用 ArticleBase 模型（不包含 content 字段，加速查询）
+        query = session.query(ArticleBase)
 
         # 支持多个状态值（逗号分隔），将字符串映射为状态码
         if status:
@@ -477,9 +472,9 @@ async def get_articles(
         # 支持 has_content 参数：true=有正文，false=无正文，None=不筛选
         if has_content is not None:
             if has_content:
-                query = query.filter((Article.content.isnot(None)) & (Article.content != ''))
+                query = query.filter(Article.has_content == 1)
             else:
-                query = query.filter(or_(Article.content.is_(None), Article.content == ''))
+                query = query.filter(Article.has_content == 0)
         if search:
             query = query.filter(format_search_kw(search))
         
@@ -495,21 +490,18 @@ async def get_articles(
         # 查询公众号名称
         from core.models.feed import Feed
         mp_names = {}
-        for result in results:
-            article = result[0]  # Article 对象
+        for article in results:
             if article.mp_id and article.mp_id not in mp_names:
                 feed = session.query(Feed).filter(Feed.id == article.mp_id).first()
                 mp_names[article.mp_id] = feed.mp_name if feed else "未知公众号"
-        
+
         # 合并公众号名称到文章列表
         article_list = []
-        for result in results:
-            article = result[0]  # Article 对象
-            has_content_val = result[1]  # has_content 计算值
+        for article in results:
             article_dict = article.__dict__.copy()
             article_dict["mp_name"] = mp_names.get(article.mp_id, "未知公众号")
             article_dict["is_favorite"] = int(getattr(article, "is_favorite", 0) or 0)
-            article_dict["has_content"] = has_content_val
+            article_dict["has_content"] = int(getattr(article, "has_content", 0) or 0)
             article_list.append(article_dict)
         
         from .base import success_response

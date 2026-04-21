@@ -86,6 +86,12 @@ def sync_article_content(
 ) -> Tuple[bool, str]:
     existing_content = (getattr(article, "content", "") or "").strip()
     if existing_content and not force:
+        if getattr(article, "has_content", 0) == 0:
+            print_info(f"article {article.id} already has content, skipping fetch")
+            article.has_content = 1
+            session.commit()
+            session.refresh(article)
+            return True, "cached"
         return False, "cached"
 
     article_url = build_article_url(article)
@@ -102,6 +108,7 @@ def sync_article_content(
             article.content = ""
             article.content_html = ""
             article.status = DATA_STATUS.DELETED
+            article.has_content = 0
             session.commit()
             session.refresh(article)
             print_info(f"article {article.id} marked as deleted via {mode}")
@@ -113,6 +120,7 @@ def sync_article_content(
         article.content = content
         article.content_html = fix_html(content)
         article.status = DATA_STATUS.ACTIVE
+        article.has_content = 1
         if not (getattr(article, "description", "") or "").strip():
             article.description = Web.get_description(content)
         # 修正成功,重置失败计数

@@ -1,7 +1,6 @@
 import threading
 from core import lax, thread
 from core.models import Article, Feed, DATA_STATUS
-from core.models.article import ArticleBase
 from core.db import DB
 from core.print import print_info, print_error
 from core.redis_client import RedisCache
@@ -25,27 +24,33 @@ class ArticleInfo():
 
 
 def laxArticle():
-    """统计文章信息"""
+    """统计文章信息 - 使用 has_content 字段优化性能"""
     info = ArticleInfo()
     session = DB.get_session()
     try:
-        # 获取没有内容的文章数量 - 同时检查 content 和 content_html 字段，排除已删除的文章
-        info.no_content_count = session.query(ArticleBase).filter(
-            ((Article.content == None) | (Article.content == '')) &
-            ((Article.content_html == None) | (Article.content_html == '')) &
-            (Article.status != DATA_STATUS.DELETED)
-        ).count()
-        # 所有文章数量 - 只查询id字段，排除已删除的文章
-        info.all_count = session.query(Article.id).filter(Article.status != DATA_STATUS.DELETED).count()
-        # 有内容的文章数量
-        info.has_content_count = info.all_count - info.no_content_count
+        from sqlalchemy import text
 
-        # 获取删除的文章 - 只查询status字段
-        info.wrong_count = session.query(ArticleBase).filter(Article.status != DATA_STATUS.ACTIVE).count()
+        # 使用 has_content 字段进行统计，避免扫描大文本字段
+        sql = text("""
+            SELECT
+                COUNT(*) as all_count,
+                SUM(CASE WHEN has_content = 0 THEN 1 ELSE 0 END) as no_content_count,
+                SUM(CASE WHEN status != 1 THEN 1 ELSE 0 END) as wrong_count
+            FROM articles
+            WHERE status != 1000
+        """)
 
-        # 公众号总数 - 只查询id字段
+        result = session.execute(sql).fetchone()
+
+        if result:
+            info.all_count = int(result[0] or 0)
+            info.no_content_count = int(result[1] or 0)
+            info.wrong_count = int(result[2] or 0)
+            info.has_content_count = info.all_count - info.no_content_count
+
+        # 公众号总数 - 单独查询，因为跨表
         info.mp_all_count = session.query(Feed.id).distinct().count()
-        
+
         return info.__dict__
     finally:
         session.close()
