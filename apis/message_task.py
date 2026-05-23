@@ -199,8 +199,12 @@ async def run_message_task(
             import json
             for task in tasks:
                 try:
-                    ids=json.loads(task.mps_id)
-                    count+=len(ids)
+                    # mps_id 可能为空（UI 提示"留空则对所有公众号生效"），
+                    # 通过 get_feeds() 拿实际 feed 数，与 jobs/mps.py 一致
+                    from jobs.mps import get_feeds
+                    feeds = get_feeds(task)
+                    ids = [{"id": f.id, "name": f.mp_name} for f in feeds]
+                    count += len(ids)
                     mps['count']=count
                     mps['list'].append(ids)
                 except Exception as e:
