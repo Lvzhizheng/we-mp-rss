@@ -69,6 +69,9 @@ class Db:
                 @event.listens_for(self.engine, "connect")
                 def set_sqlite_text_factory(dbapi_conn, connection_record):
                     # 将无效 UTF-8 字符替换为 �
+                    dbapi_conn.execute("PRAGMA journal_mode=WAL")
+                    dbapi_conn.execute("PRAGMA busy_timeout=10000")
+                    dbapi_conn.execute("PRAGMA synchronous=NORMAL")
                     dbapi_conn.text_factory = lambda x: x.decode('utf-8', errors='replace')
             
             self.session_factory=self.get_session_factory()
@@ -229,7 +232,7 @@ class Db:
         session = None
         try:
             session = self.get_session()
-            return session.query(Feed).filter(Feed.status == 1).all()
+            return session.query(Feed).filter(Feed.status == 1, Feed.faker_id != "MP_WXS_FEATURED_ARTICLES").all()
         except Exception as e:
             print(f"Failed to fetch Feed: {e}")
             return e # type: ignore
