@@ -39,8 +39,40 @@ def ApiSuccess(data):
 @router.get("/qr/code", summary="获取登录二维码")
 async def get_qrcode(current_user=Depends(get_current_user)):
 
-    code_url=WX_API.GetCode(Success)
-    return success_response(code_url)
+    # 检查是否已有二维码在生成中（避免重复触发）
+    import os
+    qr_path = "static/wx_qrcode.png"
+    if os.path.exists(qr_path):
+        # 已有二维码，直接返回
+        return success_response({
+            "code": f"/{qr_path}?t={int(os.path.getmtime(qr_path))}",
+            "is_exists": True
+        })
+
+    # 同步调用 get_qr_code，等待二维码生成完成
+    # 不使用 WX_API.GetCode() 因为它启动线程后立即返回，导致文件还没生成
+    try:
+        from driver.wx_api import get_qr_code as wx_get_qr_code
+        result = wx_get_qr_code(callback=Success, notice=None)
+        # 验证文件是否真的生成
+        if os.path.exists(qr_path):
+            return success_response({
+                "code": f"/{qr_path}?t={int(os.path.getmtime(qr_path))}",
+                "is_exists": True,
+                "msg": "请使用微信扫描二维码登录"
+            })
+        else:
+            return success_response({
+                "code": None,
+                "is_exists": False,
+                "msg": result.get("msg", "二维码生成失败")
+            })
+    except Exception as e:
+        return success_response({
+            "code": None,
+            "is_exists": False,
+            "msg": f"获取二维码失败: {str(e)}"
+        })
 @router.get("/qr/image", summary="获取登录二维码图片")
 async def qr_image(current_user=Depends(get_current_user)):
     return success_response(WX_API.GetHasCode())
