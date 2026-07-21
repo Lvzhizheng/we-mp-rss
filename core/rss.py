@@ -138,10 +138,21 @@ class RSS:
                 enclosure.set("type", "image/jpeg")
             if full_context==True:
                 try:
+                    raw_content = str(rss_item['content'])
+                    # 单条 content 长度上限，避免 RSS feed 整体过大导致阅读器拉取超时
+                    max_bytes = int(cfg.get("rss.max_content_bytes", 200000) or 200000)
+                    encoded_bytes = raw_content.encode("utf-8")
+                    if max_bytes > 0 and len(encoded_bytes) > max_bytes:
+                        truncated = raw_content.encode("utf-8")[:max_bytes].decode("utf-8", errors="ignore")
+                        tail = (
+                            "<p><em>...(内容过长已截断，"
+                            f"<a href='{rss_item['link']}' target='_blank'>查看原文</a>)</em></p>"
+                        )
+                        raw_content = truncated + tail
                     if cfg.get("rss.cdata",False)==True:
-                        content = f"<![CDATA[{str(rss_item['content'])}]]>"  # 使用CDATA包裹内容
+                        content = f"<![CDATA[{raw_content}]]>"  # 使用CDATA包裹内容
                     else:
-                        content = str(rss_item['content'])
+                        content = raw_content
                     ET.SubElement(item, "content:encoded").text = content
                 except Exception as e:
                     print(f"Error adding content:encoded element: {e}")

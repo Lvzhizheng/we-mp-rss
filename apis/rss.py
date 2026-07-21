@@ -309,7 +309,7 @@ async def rss(
     request: Request,
     feed_id: str,
     ext: str,
-    limit: int = Query(50, ge=1, le=100),
+    limit: int = Query(int(cfg.get("rss.default_limit", 20) or 20), ge=1, le=100),
     offset: int = Query(0, ge=0),
     kw:str="",
     content_type:str=Query(None,alias="ctype"),
